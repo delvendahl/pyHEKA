@@ -20,10 +20,10 @@ Brief example::
 
 """
 
-import struct
 from heka_common import Data
 import heka_v1000
 import heka_v2000
+import heka_v9
 
 
 class Bundle(object):
@@ -40,6 +40,12 @@ class Bundle(object):
 
         self.fh.seek(8)
         version = self.fh.read(32).decode('utf-8', errors='ignore').rstrip('\0')
+
+        v9_versions = [
+            "v2.11, 14-Mar-2006",
+            "v2x65, 19-Dec-2011",
+        ]
+        # v2x90.2, 22-Nov-2016 seems to have yet another format
 
         v1000_versions = [
             "v2x90.3, 19-Mar-2018",
@@ -63,6 +69,9 @@ class Bundle(object):
         elif version in v2000_versions:
             self.file_format = 'v2000'
             self.v = heka_v2000
+        elif version in v9_versions:
+            self.file_format = 'v9'
+            self.v = heka_v9
         else:
             if version.startswith("1.6") or version.startswith("1.7") or version.startswith("1.8"):
                 self.file_format = 'v2000'
@@ -79,10 +88,15 @@ class Bundle(object):
         }
         
         # read Endianness from file header
-        self.fh.seek(47)        
-        endian = '<' if struct.unpack('?', self.fh.read(1))[0] else '>'
+        self.fh.seek(47)  
+        endian = '<' if self.fh.read(1) == b'\x01' else '>'
         self.fh.seek(0)
+        endian = '<'
         self.header = self.v.BundleHeader(self.fh, endian)
+        if not self.header.IsLittleEndian:
+            self.endian = '>'
+            self.fh.seek(0)
+            self.header = self.v.BundleHeader(self.fh, self.endian)
 
         # catalog extensions of bundled items
         self.catalog = {}
