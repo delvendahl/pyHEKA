@@ -8,15 +8,16 @@ import datetime
 def cstr(byt):
     """Convert C string bytes to python string.
     """
-    try:
-        ind = byt.index(b'\0')
-    except ValueError:
+    ind = byt.find(b'\0')
+    if ind == -1:
         return byt
     return byt[:ind].decode('utf-8', errors='ignore')
 
 def cbyte(byt):
     """Convert C string byte to python integer.
     """
+    if isinstance(byt, int):
+        return byt
     try:
         return byt[0]
     except (ValueError, IndexError):
@@ -29,48 +30,50 @@ def cchar(byt):
 
 def heka_time_to_datetime(stored_time) -> datetime.datetime:
     ''' convert HEKA time to a datetime object '''
-    WinEpoch = datetime.datetime(1601, 1, 1)
-    MacEpoch = datetime.datetime(1904, 1, 1)
     HekaEpoch = datetime.datetime(1990, 1, 1)
 
-    windows_offset = 7980681600.0
-    seconds_1904_to_1990 = (HekaEpoch - MacEpoch).total_seconds()
-
-    wrap = 2**32
-    candidates = []
     try:
+        # Optimization: in most cases it's just HekaEpoch + stored_time
+        # and it falls within reasonable range.
+
+        # --- HEKA 1990 epoch ---
+        c = HekaEpoch + datetime.timedelta(seconds=stored_time)
+
+        now = datetime.datetime.now()
+        lower = datetime.datetime(1990, 1, 1)
+        upper = now + datetime.timedelta(days=7)
+
+        if lower < c < upper:
+            return c
+
+        WinEpoch = datetime.datetime(1601, 1, 1)
+        MacEpoch = datetime.datetime(1904, 1, 1)
+        windows_offset = 7980681600.0
+        seconds_1904_to_1990 = 2713910400.0 # (HekaEpoch - MacEpoch).total_seconds()
+
+        candidates = []
+        wrap = 2**32
         if stored_time > wrap:
             t = stored_time + windows_offset
             candidates.append(WinEpoch + datetime.timedelta(seconds=t))
 
-        # --- HEKA 1990 epoch ---
-        candidates.append(HekaEpoch + datetime.timedelta(seconds=stored_time))
+        candidates.append(c) # already there but for completeness
 
-        # --- Classic Mac 1904 epoch variant ---
         t = stored_time - seconds_1904_to_1990
         candidates.append(MacEpoch + datetime.timedelta(seconds=t))
-        # choose the most plausible date
-        now = datetime.datetime.now()
-        lower = datetime.datetime(1990, 1, 1)
-        upper = now + datetime.timedelta(days=7)
 
         for c in candidates:
             if lower < c < upper:
                 return c
 
-        # fallback: return first interpretation
         return candidates[0]
 
-    except OverflowError: # may occur if header was read with wrong endianness
+    except OverflowError:
         return 'Invalid time value: {}'.format(stored_time)
     
 def timer_timestamp(total_seconds: float) -> datetime.timedelta:
     ''' Converts seconds to a datetime timedelta object '''
-    hours, remainder = divmod(total_seconds, 60*60)
-    minutes, seconds = divmod(remainder, 60)
-    milliseconds = (seconds % 1) * 1000
-
-    return datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds), milliseconds=int(milliseconds))
+    return datetime.timedelta(seconds=total_seconds)
 
 def getFromList(lst, index):
     try:
@@ -140,26 +143,26 @@ def getADCMode(byte):
     return getFromList(["AdcOff", "Analog", "Digitals", "Digital", "AdcVirtual"], byte)
 
 def convertDataKind(byte):
-    d = {}
-    d["IsLittleEndian"] = bool(byte & (1 << 0))
-    d["IsLeak"] = bool(byte & (1 << 1))
-    d["IsVirtual"] = bool(byte & (1 << 2))
-    d["IsImon"] = bool(byte & (1 << 3))
-    d["IsVmon"] = bool(byte & (1 << 4))
-    d["Clip"] = bool(byte & (1 << 5))
-    return d
+    return {
+        "IsLittleEndian": bool(byte & 1),
+        "IsLeak": bool(byte & 2),
+        "IsVirtual": bool(byte & 4),
+        "IsImon": bool(byte & 8),
+        "IsVmon": bool(byte & 16),
+        "Clip": bool(byte & 32)
+    }
 
 def convertStimToDacID(byte):
-    d = {}
-    d["UseStimScale"] = bool(byte & (1 << 0))
-    d["UseRelative"] = bool(byte & (1 << 1))
-    d["UseFileTemplate"] = bool(byte & (1 << 2))
-    d["UseForLockIn"] = bool(byte & (1 << 3))
-    d["UseForWavelength"] = bool(byte & (1 << 4))
-    d["UseScaling"] = bool(byte & (1 << 5))
-    d["UseForChirp"] = bool(byte & (1 << 6))
-    d["UseForImaging"] = bool(byte & (1 << 7))
-    return d
+    return {
+        "UseStimScale": bool(byte & 1),
+        "UseRelative": bool(byte & 2),
+        "UseFileTemplate": bool(byte & 4),
+        "UseForLockIn": bool(byte & 8),
+        "UseForWavelength": bool(byte & 16),
+        "UseScaling": bool(byte & 32),
+        "UseForChirp": bool(byte & 64),
+        "UseForImaging": bool(byte & 128)
+    }
 
 def getSquareKind(byte):
     return getFromList(["Common Frequency"], byte)
@@ -179,14 +182,9 @@ class Struct():
         field_info = self._field_info()
         if not isinstance(data, (str, bytes)):
             data = data.read(self._le_struct.size)
-        if endian == '<':
-            items = self._le_struct.unpack(data)
-        elif endian == '>':
-            items = self._be_struct.unpack(data)
-        else:
-            raise ValueError('Invalid endian: %s' % endian)
 
-        fields = collections.OrderedDict()
+        struct_obj = self._le_struct if endian == '<' else self._be_struct
+        items = struct_obj.unpack(data)
 
         i = 0
         for name, fmt, func in field_info:
@@ -198,18 +196,20 @@ class Struct():
                 item = items[i:i+n]
                 i += n
 
-            if isinstance(func, tuple):
-                substr, func = func
-                item = substr(item, endian)
-
-            if func is None:
-                continue
             if func is not True:
-                item = func(item)
-            fields[name] = item
-            setattr(self, name, item)
+                if isinstance(func, tuple):
+                    substr, func = func
+                    item = substr(item, endian)
 
-        self.fields = fields
+                if func is None:
+                    continue
+
+                if callable(func):
+                    item = func(item)
+                elif func is False:
+                    continue
+
+            setattr(self, name, item)
 
     @classmethod
     def _field_info(cls):
@@ -256,25 +256,31 @@ class Struct():
     def __str__(self, indent=0):
         indent_str = '    '*indent
         r = indent_str + '%s(\n' % self.__class__.__name__
-        if not hasattr(self, 'fields'):
-            r = r[:-1] + '<initializing>)'
-            return r
-        for k, v in self.fields.items():
-            if isinstance(v, Struct):
-                r += indent_str + '    %s = %s\n' % \
-                    (k, v.__str__(indent=indent+1).lstrip())
-            else:
-                r += indent_str + '    %s = %r\n' % (k, v)
+        for name, _, _ in self._field_info():
+            if hasattr(self, name):
+                v = getattr(self, name)
+                if isinstance(v, Struct):
+                    r += indent_str + '    %s = %s\n' % \
+                        (name, v.__str__(indent=indent+1).lstrip())
+                else:
+                    r += indent_str + '    %s = %r\n' % (name, v)
         r += indent_str + ')'
         return r
 
+    def __repr__(self, indent=0):
+        return self.__str__(indent)
+
     def get_fields(self):
-        fields = self.fields.copy()
-        for k,v in fields.items():
-            if isinstance(v, StructArray):
-                fields[k] = [x.get_fields() for x in v.array]
-            elif isinstance(v, Struct):
-                fields[k] = v.get_fields()
+        fields = collections.OrderedDict()
+        for name, _, _ in self._field_info():
+            if hasattr(self, name):
+                v = getattr(self, name)
+                if isinstance(v, StructArray):
+                    fields[name] = [x.get_fields() for x in v.array]
+                elif isinstance(v, Struct):
+                    fields[name] = v.get_fields()
+                else:
+                    fields[name] = v
         return fields
 
 class StructArray(Struct):
@@ -287,8 +293,7 @@ class StructArray(Struct):
         items = []
         isize = self.item_struct.size()
         for i in range(self.array_size):
-            d = data[:isize]
-            data = data[isize:]
+            d = data[i*isize:(i+1)*isize]
             items.append(self.item_struct(d, endian))
         self.array = items
 
@@ -296,8 +301,8 @@ class StructArray(Struct):
         return self.array[i]
 
     @classmethod
-    def size(self):
-        return self.item_struct.size() * self.array_size
+    def size(cls):
+        return cls.item_struct.size() * cls.array_size
 
     def __repr__(self, indent=0):
         r = '    '*indent + '%s(\n' % self.__class__.__name__
@@ -315,9 +320,8 @@ class TreeNode(Struct):
         realsize = pul.level_sizes[level]
         structsize = self.size()
         data = fh.read(realsize)
-        diff = structsize - realsize
-        if diff > 0:
-            data = data + b'\0'*diff
+        if len(data) < structsize:
+            data = data + b'\0'*(structsize - len(data))
         else:
             data = data[:structsize]
 
@@ -355,7 +359,8 @@ class Data(object):
 
     def __getitem__(self, *args):
         index = args[0]
-        assert len(index) == 4
+        if not isinstance(index, tuple) or len(index) != 4:
+            raise IndexError("Index must be a tuple of length 4 (group, series, sweep, trace)")
         pul = self.bundle.pul
         trace = pul[index[0]][index[1]][index[2]][index[3]]
         fh = self.bundle.fh
