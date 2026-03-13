@@ -61,7 +61,7 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
         # fallback: return first interpretation
         return candidates[0]
 
-    except OverflowError:
+    except OverflowError: # may occur if header was read with wrong endianness
         return 'Invalid time value: {}'.format(stored_time)
     
 def timer_timestamp(total_seconds: float) -> datetime.timedelta:
