@@ -20,6 +20,7 @@ Brief example::
 
 """
 
+import struct
 from heka_common import Data
 import heka_v1000
 import heka_v2000
@@ -76,16 +77,12 @@ class Bundle(object):
             '.amp': self.v.Amplifier,
             '.pgf': self.v.Stimulus,
         }
-
+        
+        # read Endianness from file header
+        self.fh.seek(47)        
+        endian = '<' if struct.unpack('?', self.fh.read(1))[0] else '>'
         self.fh.seek(0)
-        # Read header assuming little endian
-        endian = '<'
         self.header = self.v.BundleHeader(self.fh, endian)
-        # If the header is bad, re-read using big endian
-        if not self.header.IsLittleEndian:
-            endian = '>'
-            self.fh.seek(0)
-            self.header = self.v.BundleHeader(self.fh, endian)
 
         # catalog extensions of bundled items
         self.catalog = {}

@@ -30,19 +30,40 @@ def cchar(byt):
 def heka_time_to_datetime(stored_time) -> datetime.datetime:
     ''' convert HEKA time to a datetime object '''
     WinEpoch = datetime.datetime(1601, 1, 1)
-    MacEPoch = datetime.datetime(1904, 1, 1)
+    MacEpoch = datetime.datetime(1904, 1, 1)
+    HekaEpoch = datetime.datetime(1990, 1, 1)
 
     windows_offset = 7980681600.0
-    JanFirst1990 = 1580970496.0
+    seconds_1904_to_1990 = (HekaEpoch - MacEpoch).total_seconds()
+
     wrap = 2**32
+    candidates = []
+    try:
+        if stored_time > wrap:
+            t = stored_time + windows_offset
+            candidates.append(WinEpoch + datetime.timedelta(seconds=t))
 
-    if stored_time > wrap:   # almost certainly Windows
-        t = stored_time + windows_offset
-        return WinEpoch + datetime.timedelta(seconds=t)
-    else:                    # likely Mac
-        t = stored_time - JanFirst1990
-        return MacEPoch + datetime.timedelta(seconds=t)
+        # --- HEKA 1990 epoch ---
+        candidates.append(HekaEpoch + datetime.timedelta(seconds=stored_time))
 
+        # --- Classic Mac 1904 epoch variant ---
+        t = stored_time - seconds_1904_to_1990
+        candidates.append(MacEpoch + datetime.timedelta(seconds=t))
+        # choose the most plausible date
+        now = datetime.datetime.now()
+        lower = datetime.datetime(1990, 1, 1)
+        upper = now + datetime.timedelta(days=7)
+
+        for c in candidates:
+            if lower < c < upper:
+                return c
+
+        # fallback: return first interpretation
+        return candidates[0]
+
+    except OverflowError:
+        return 'Invalid time value: {}'.format(stored_time)
+    
 def timer_timestamp(total_seconds: float) -> datetime.timedelta:
     ''' Converts seconds to a datetime timedelta object '''
     hours, remainder = divmod(total_seconds, 60*60)
