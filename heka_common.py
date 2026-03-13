@@ -4,6 +4,7 @@ import struct
 import collections
 import datetime
 
+
 def cstr(byt):
     """Convert C string bytes to python string.
     """
@@ -26,8 +27,8 @@ def cchar(byt):
     """
     return byt.decode('utf-8', errors='ignore')
 
-def heka_time_to_datetime(stored_time):
-    ''' convert HEKA time to a datetime object (v1000) '''
+def heka_time_to_datetime(stored_time) -> datetime.datetime:
+    ''' convert HEKA time to a datetime object '''
     WinEpoch = datetime.datetime(1601, 1, 1)
     MacEPoch = datetime.datetime(1904, 1, 1)
 
@@ -42,25 +43,13 @@ def heka_time_to_datetime(stored_time):
         t = stored_time - JanFirst1990
         return MacEPoch + datetime.timedelta(seconds=t)
 
-def heka_time_to_date_v2000(time):
-    ''' convert HEKA time to a date string (v2000) '''
-    time -= 1580970496 # JanFirst1990
-    if time < 0:
-        time += 4294967296 # HIGH_DWORD
-    time += 9561652096 # MAC_BASE
-
-    ref = datetime.datetime(1601, 1, 1) # Windows reference date
-    conv_time = datetime.timedelta(seconds=time)
-
-    return (ref + conv_time).strftime("%d-%b-%Y %H:%M:%S.%f")
-
-def timer_timestamp(total_seconds: float) -> str:
-    ''' Converts seconds to a string representation of a HH:MM:SS.ms timestamp '''
+def timer_timestamp(total_seconds: float) -> datetime.timedelta:
+    ''' Converts seconds to a datetime timedelta object '''
     hours, remainder = divmod(total_seconds, 60*60)
     minutes, seconds = divmod(remainder, 60)
     milliseconds = (seconds % 1) * 1000
 
-    return f'{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}.{milliseconds:.0f}'
+    return datetime.timedelta(hours=int(hours), minutes=int(minutes), seconds=int(seconds), milliseconds=int(milliseconds))
 
 def getFromList(lst, index):
     try:

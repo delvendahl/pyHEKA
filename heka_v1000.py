@@ -13,7 +13,7 @@ class BundleHeader(Struct):
     field_info = [
         ('Signature', '8s', cstr),
         ('Version', '32s', cstr),
-        ('Time', 'd'),
+        ('Time', 'd', heka_time_to_datetime),
         ('Items', 'i'),
         ('IsLittleEndian', '?'),
         ('Reserved', '11s', None),

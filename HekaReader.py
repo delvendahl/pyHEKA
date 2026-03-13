@@ -20,10 +20,10 @@ Brief example::
 
 """
 
-import struct
 from heka_common import Data
 import heka_v1000
 import heka_v2000
+
 
 class Bundle(object):
     """
@@ -36,20 +36,6 @@ class Bundle(object):
 
         if self.fh.read(4) != b'DAT2':
             raise ValueError(f"No support for other files than 'DAT2' format")
-
-        self.fh.seek(0)
-        # Version is stored at offset 4 for 32 bytes in v1000,
-        # but the whole header is different.
-        # Let's read first 64 bytes to be safe and find version.
-        self.fh.seek(0)
-        version_data = self.fh.read(64)
-        # Signature 'DAT2' is 4 bytes, then version string follows at offset 4?
-        # In v2000 code, it was seeking to 8 and reading 32 bytes.
-        # In v1000 code, it was seeking to 0 and reading 32 bytes (which includes DAT2).
-
-        # Actually let's look at the Version field in BundleHeader.
-        # v1000: ('Signature', '8s'), ('Version', '32s') -> Version starts at 8
-        # v2000: ('Signature', '8s'), ('Version', '32s') -> Version starts at 8
 
         self.fh.seek(8)
         version = self.fh.read(32).decode('utf-8', errors='ignore').rstrip('\0')
@@ -77,15 +63,12 @@ class Bundle(object):
             self.file_format = 'v2000'
             self.v = heka_v2000
         else:
-            # Fallback or error?
-            # Many versions might not be in the list.
-            # Maybe check version string prefix or just default to v1000 if not v2000.
             if version.startswith("1.6") or version.startswith("1.7") or version.startswith("1.8"):
-                 self.file_format = 'v2000'
-                 self.v = heka_v2000
+                self.file_format = 'v2000'
+                self.v = heka_v2000
             else:
-                 self.file_format = 'v1000'
-                 self.v = heka_v1000
+                self.file_format = 'unsupported'
+                raise ValueError(f"Unsupported file version: {version}")
         
         self.item_classes = {
             '.pul': self.v.Pulsed,
