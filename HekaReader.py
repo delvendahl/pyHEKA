@@ -1147,7 +1147,32 @@ class Bundle(object):
             raise ValueError(f"No support for other files than 'DAT2' format")
 
         self.fh.seek(0)
+        version = self.fh.read(32).decode('utf-8').rstrip('\0')
 
+        v1000 = ["v2x90.3, 19-Mar-2018",
+        "v2x90.4, 30-Oct-2018",
+        "v2x90.5, 09-Apr-2019",        
+        "v2x91, 23-Feb-2021",
+        "v2x91, 06-Jul-2020",
+        "v2x92, 23-February-2023",
+        "v2x92, 1-June-2023",
+        "1.2.0 [Build 1469]",
+        "1.3.0 [Build 1008]",
+        "1.4.1 [Build 1036]",
+        "1.5.0 [Build 1061]",]
+
+        v2000 = ["1.6.0 [Build 1066]"]
+
+        # check which version we have
+        if version in v1000:
+            self.file_format = 'v1000'
+        elif version in v2000:
+            self.file_format = 'v2000'
+        # print(f"Version: {version}, File format: {self.file_format}")
+        
+        if self.file_format != 'v1000':
+            raise ValueError(f"No support for file format {self.file_format}")
+        
         # Read header assuming little endian
         endian = '<'
         self.header = BundleHeader(self.fh, endian)
