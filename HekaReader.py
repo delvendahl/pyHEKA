@@ -88,8 +88,6 @@ class Bundle(object):
         }
         
         # read Endianness from file header
-        self.fh.seek(47)  
-        endian = '<' if self.fh.read(1) == b'\x01' else '>'
         self.fh.seek(0)
         endian = '<'
         self.header = self.v.BundleHeader(self.fh, endian)
