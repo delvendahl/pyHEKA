@@ -86,7 +86,7 @@ class TestBundleSummary(unittest.TestCase):
         mock_sweep.children = [mock_trace]
         series1.children = [mock_sweep]
 
-        series1.NumberSweeps = 5
+        series1.__len__ = MagicMock(return_value=5)
 
         group1.children = [series1]
         mock_pul.children = [group1]

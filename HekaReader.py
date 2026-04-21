@@ -173,5 +173,5 @@ class Bundle(object):
                             mode = series.children[0].children[0].RecordingMode
                         except (AttributeError, IndexError):
                             pass
-                        print(f"    Series {j+1}: {series.Label} (Mode: {mode}, {series.NumberSweeps} sweeps)")
+                        print(f"    Series {j+1}: {series.Label} (Mode: {mode}, {len(series)} sweeps)")
         print("-" * 40)
