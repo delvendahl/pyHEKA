@@ -20,10 +20,10 @@ Brief example::
 
 """
 
-from heka_common import Data
-import heka_v1000
-import heka_v2000
-import heka_v9
+from heka import Data
+from heka import heka_v1000
+from heka import heka_v2000
+from heka import heka_v9
 
 
 class Bundle(object):

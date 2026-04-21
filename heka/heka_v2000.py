@@ -1,13 +1,13 @@
 import struct
-from heka_common import *
+from .heka_common import *
 
 class BundleItem(Struct):
     field_info = [
-        ('Start', 'i'),
-        ('Length', 'i'),
+        ('Start', 'q'),
+        ('Length', 'q'),
         ('Extension', '8s', cstr),
     ]
-    size_check = 16
+    size_check = 24
 
 class BundleHeader(Struct):
     field_info = [
@@ -16,18 +16,20 @@ class BundleHeader(Struct):
         ('Time', 'd', heka_time_to_datetime),
         ('Items', 'i'),
         ('IsLittleEndian', '?'),
-        ('Reserved', '11s', None),
+        ('Reserved', '3s', None),
+        ('FileFormat', 'i'),
+        ('Reserved2', '4s', None),
         ('BundleItems', BundleItem.array(12)),
     ]
-    size_check = 256
+    size_check = 352
 
 class TraceRecord(TreeNode):
     field_info = [
         ('Mark', 'i'),
         ('Label', '32s', cstr),
         ('TraceID', 'i'),
-        ('Data', 'i'),
-        ('DataPoints', 'i'),
+        ('Data', 'q'),
+        ('DataPoints', 'q'),
         ('InternalSolution', 'i'),
         ('AverageCount', 'i'),
         ('LeakID', 'i'),
@@ -72,8 +74,8 @@ class TraceRecord(TreeNode):
         ('CRC', 'I'),
         ('GS', 'd'),
         ('SelfChannel', 'i'),
-        ('InterleaveSize', 'i'),
-        ('InterleaveSkip', 'i'),
+        ('InterleaveSize', 'q'),
+        ('InterleaveSkip', 'q'),
         ('ImageIndex', 'i'),
         ('TrMarkers', '10d'),
         ('SECM_X', 'd'),
@@ -88,7 +90,7 @@ class TraceRecord(TreeNode):
         ('ExtSolName', '32s', cstr),
         ('DataPedestal', 'd'),
     ]
-    size_check = 512
+    size_check = 528
 
 class SweepRecord(TreeNode):
     field_info = [
@@ -151,7 +153,7 @@ class AmplifierState(Struct):
         ('SearchDelay', 'd'),
         ('MConductance', 'd'),
         ('MCapacitance', 'd'),
-        ('SerialNumber', '8s', cstr),
+        ('SerialNumber', '8s', cchar),
         ('E9Boards', 'h'),
         ('CSlowCycles', 'h'),
         ('IMonAdc', 'h'),
@@ -192,7 +194,7 @@ class AmplifierState(Struct):
         ('CanCCTracking', 'b'),
         ('HasVmonPath', 'b'),
         ('HasNewCCMode', 'b'),
-        ('Selector', 'c', cbyte),
+        ('Selector', 'b'),
         ('HoldInverted', 'b'),
         ('AutoCFast', '?'),
         ('AutoCSlow', '?'),
@@ -333,7 +335,7 @@ class StimulationRecord(TreeNode):
         ('FileName', '32s', cstr),
         ('AnalName', '32s', cstr),
         ('DataStartSegment', 'i'),
-        ('DataStartTime', 'd'),
+        ('DataStartTime', 'd', heka_time_to_datetime),
         ('SampleInterval', 'd'),
         ('SweepInterval', 'd'),
         ('LeakDelay', 'd'),
