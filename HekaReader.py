@@ -144,3 +144,28 @@ class Bundle(object):
         
     def __repr__(self):
         return "Bundle(%r)" % list(self.catalog.keys())
+
+    def summary(self, detailed=False):
+        """Print a summary of the bundle content.
+        """
+        print(f"File: {self.file_name}")
+        print(f"Format: {self.file_format}")
+        print(f"Version: {self.header.Version}")
+        print(f"Time: {self.header.Time}")
+        print("-" * 40)
+
+        pgf = self.pgf
+        if pgf is not None:
+            protocols = [p.EntryName for p in pgf.children]
+            print(f"PGF Protocols: {', '.join(protocols)}")
+            print("-" * 40)
+
+        pul = self.pul
+        if pul is not None:
+            print("Data Content:")
+            for i, group in enumerate(pul.children):
+                print(f"Group {i+1}: {group.Label} ({len(group.children)} series)")
+                if detailed:
+                    for j, series in enumerate(group.children):
+                        print(f"    Series {j+1}: {series.Label} (Method: {series.MethodName}, {series.NumberSweeps} sweeps)")
+        print("-" * 40)
