@@ -1,7 +1,25 @@
 import struct
-from heka_common import *
-from heka_v1000 import BundleItem, BundleHeader, LockInParams, AmplifierState, UserParamDescrType
+from .heka_common import *
 
+class BundleItem(Struct):
+    field_info = [
+        ('Start', 'i'),
+        ('Length', 'i'),
+        ('Extension', '8s', cstr),
+    ]
+    size_check = 16
+
+class BundleHeader(Struct):
+    field_info = [
+        ('Signature', '8s', cstr),
+        ('Version', '32s', cstr),
+        ('Time', 'd', heka_time_to_datetime),
+        ('Items', 'i'),
+        ('IsLittleEndian', '?'),
+        ('Reserved', '11s', None),
+        ('BundleItems', BundleItem.array(12)),
+    ]
+    size_check = 256
 
 class TraceRecord(TreeNode):
     field_info = [
@@ -15,7 +33,8 @@ class TraceRecord(TreeNode):
         ('LeakID', 'i'),
         ('LeakTraces', 'i'),
         ('DataKind', 'h', convertDataKind),
-        ('Filler1', 'h', None),
+        ('UseXStart', '?'),
+        ('TcKind', 'b'),
         ('RecordingMode', 'b', getRecordingMode),
         ('AmplIndex', 'b'),
         ('DataFormat', 'b', getDataFormat),
@@ -49,7 +68,7 @@ class TraceRecord(TreeNode):
         ('CM', 'd'),
         ('GM', 'd'),
         ('Phase', 'd'),
-        ('DataCRC', 'I'),
+        ('DataCRC', 'i'),
         ('CRC', 'I'),
         ('GS', 'd'),
         ('SelfChannel', 'i'),
@@ -59,9 +78,17 @@ class TraceRecord(TreeNode):
         ('TrMarkers', '10d'),
         ('SECM_X', 'd'),
         ('SECM_Y', 'd'),
-        ('SECM_Z', 'd')
+        ('SECM_Z', 'd'),
+        ('TrHolding', 'd'),
+        ('TcEnumerator', 'i'),
+        ('XTrace', 'i'),
+        ('IntSolValue', 'd'),
+        ('ExtSolValue', 'd'),
+        ('IntSolName', '32s', cstr),
+        ('ExtSolName', '32s', cstr),
+        ('DataPedestal', 'd'),
     ]
-    size_check = 408
+    size_check = 512
 
 class SweepRecord(TreeNode):
     field_info = [
@@ -72,19 +99,163 @@ class SweepRecord(TreeNode):
         ('SweepCount', 'i'),
         ('Time', 'd', heka_time_to_datetime),
         ('Timer', 'd', timer_timestamp),
-        ('SwUserParams', '4d'),
+        ('SwUserParams', '2d'),
+        ('PipPressure', 'd'),
+        ('RMSNoise', 'd'),
         ('Temperature', 'd'),
         ('OldIntSol', 'i'),
         ('OldExtSol', 'i'),
         ('DigitalIn', 'h'),
         ('SweepKind', 'h'),
-        ('Filler1', 'i', None),
+        ('DigitalOut', 'h'),
+        ('Filler1', 'h', None),
         ('Markers', '4d'),
         ('Filler2', 'i', None),
-        ('CRC', 'I')
+        ('CRC', 'I'),
+        ('SwHolding', '16d'),
+        ('SwUserParamEx', '8d'),
     ]
-    size_check = 160
+    size_check = 352
 
+class UserParamDescrType(Struct):
+    field_info = [
+        ('Name', '32s', cstr),
+        ('Unit', '8s', cstr),
+    ]
+    size_check = 40
+
+class AmplifierState(Struct):
+    field_info = [
+        ('StateVersion', '8s', cstr),
+        ('RealCurrentGain', 'd'),
+        ('RealF2Bandwidth', 'd'),
+        ('F2Frequency', 'd'),
+        ('RsValue', 'd'),
+        ('RsFraction', 'd'),
+        ('GLeak', 'd'),
+        ('CFastAmp1', 'd'),
+        ('CFastAmp2', 'd'),
+        ('CFastTau', 'd'),
+        ('CSlow', 'd'),
+        ('GSeries', 'd'),
+        ('StimDacScale', 'd'),
+        ('CCStimScale', 'd'),
+        ('VHold', 'd'),
+        ('LastVHold', 'd'),
+        ('VpOffset', 'd'),
+        ('VLiquidJunction', 'd'),
+        ('CCIHold', 'd'),
+        ('CSlowStimVolts', 'd'),
+        ('CCTrackVHold', 'd'),
+        ('TimeoutLength', 'd'),
+        ('SearchDelay', 'd'),
+        ('MConductance', 'd'),
+        ('MCapacitance', 'd'),
+        ('SerialNumber', '8s', cstr),
+        ('E9Boards', 'h'),
+        ('CSlowCycles', 'h'),
+        ('IMonAdc', 'h'),
+        ('VMonAdc', 'h'),
+        ('MuxAdc', 'h'),
+        ('TstDac', 'h'),
+        ('StimDac', 'h'),
+        ('StimDacOffset', 'h'),
+        ('MaxDigitalBit', 'h'),
+        ('HasCFastHigh', 'b'),
+        ('CFastHigh', 'b'),
+        ('HasBathSense', 'b'),
+        ('BathSense', 'b'),
+        ('HasF2Bypass', 'b'),
+        ('sF2Mode', 'b'),
+        ('AmplKind', 'b', getAmplifierType),
+        ('IsEpc9N', 'b'),
+        ('ADBoard', 'b', getADBoard),
+        ('BoardVersion', 'b'),
+        ('ActiveE9Board', 'b'),
+        ('Mode', 'b', getClampMode),
+        ('Range', 'b'),
+        ('F2Response', 'b'),
+        ('RsOn', 'b'),
+        ('CSlowRange', 'b', getCSlowRange),
+        ('CCRange', 'b'),
+        ('CCGain', 'b'),
+        ('CSlowToTstDac', 'b'),
+        ('StimPath', 'b'),
+        ('CCTrackTau', 'b'),
+        ('WasClipping', 'b'),
+        ('RepetitiveCSlow', 'b'),
+        ('LastCSlowRange', 'b', getCSlowRange),
+        ('Old1', 'b', None),
+        ('CanCCFast', 'b'),
+        ('CanLowCCRange', 'b'),
+        ('CanHighCCRange', 'b'),
+        ('CanCCTracking', 'b'),
+        ('HasVmonPath', 'b'),
+        ('HasNewCCMode', 'b'),
+        ('Selector', 'c', cbyte),
+        ('HoldInverted', 'b'),
+        ('AutoCFast', '?'),
+        ('AutoCSlow', '?'),
+        ('HasVmonX100', 'b'),
+        ('TestDacOn', 'b'),
+        ('QMuxAdcOn', 'b'),
+        ('RealImon1Bandwidth', 'd'),
+        ('StimScale', 'd'),
+        ('Gain', 'b', getAmplifierGain),
+        ('Filter1', 'b'),
+        ('StimFilterOn', 'b'),
+        ('RsSlow', 'b'),
+        ('Old2', 'b', None),
+        ('CCCFastOn', '?'),
+        ('CCFastSpeed', 'b'),
+        ('F2Source', 'b'),
+        ('TestRange', 'b'),
+        ('TestDacPath', 'b'),
+        ('MuxChannel', 'b'),
+        ('MuxGain64', 'b'),
+        ('VmonX100', 'b'),
+        ('IsQuadro', 'b'),
+        ('F1Mode', 'b'),
+        ('Old3', 'b', None),
+        ('StimFilterHz', 'd'),
+        ('RsTau', 'd'),
+        ('DacToAdcDelay', 'd'),
+        ('InputFilterTau', 'd'),
+        ('OutputFilterTau', 'd'),
+        ('VmonFactor', 'd', None),
+        ('CalibDate', '16s', cstr),
+        ('VmonOffset', 'd'),
+        ('EEPROMKind', 'b'),
+        ('VrefX2', 'b'),
+        ('HasVrefX2AndF2Vmon', 'b'),
+        ('Spare1', 'b', None),
+        ('Spare2', 'b', None),
+        ('Spare3', 'b', None),
+        ('Spare4', 'b', None),
+        ('Spare5', 'b', None),
+        ('CCStimDacScale', 'd'),
+        ('VmonFiltBandwidth', 'd'),
+        ('VmonFiltFrequency', 'd'),
+    ]
+    size_check = 400
+
+class LockInParams(Struct):
+    field_info = [
+        ('ExtCalPhase', 'd'),
+        ('ExtCalAtten', 'd'),
+        ('PLPhase', 'd'),
+        ('PLPhaseY1', 'd'),
+        ('PLPhaseY2', 'd'),
+        ('UsedPhaseShift', 'd'),
+        ('UsedAttenuation', 'd'),
+        ('Spares2', '8s', None),
+        ('ExtCalValid', '?'),
+        ('PLPhaseValid', '?'),
+        ('LockInMode', 'b'),
+        ('CalMode', 'b'),
+        ('Spares', '28s', None),
+    ]
+    size_check = 96
 
 class SeriesRecord(TreeNode):
     field_info = [
@@ -98,20 +269,22 @@ class SeriesRecord(TreeNode):
         ('MethodTag', 'i'),
         ('Time', 'd', heka_time_to_datetime),
         ('PageWidth', 'd'),
-        ('UserDescr1', UserParamDescrType.array(4)),
+        ('UserDescr1', UserParamDescrType.array(2)),
+        ('Filler1', UserParamDescrType.array(2), None),
         ('MethodName', '32s', cstr),
         ('PhotoParams1', '4d'),
         ('LockInParams', LockInParams),
         ('AmplifierState', AmplifierState),
         ('Username', '80s', cstr),
         ('PhotoParams2', UserParamDescrType.array(4)),
-        ('Filler1', 'i', None),
+        ('Filler2', 'i', None),
         ('CRC', 'I'),
         ('UserParams2', '4d'),
         ('UserParamDescr2', UserParamDescrType.array(4)),
-        ('ScanParams', '96s', cstr),
+        ('ScanParams', '12d'),
+        ('UserDescr2', UserParamDescrType.array(8)),
     ]
-    size_check = 1408
+    size_check = 1728
 
 class GroupRecord(TreeNode):
     field_info = [
@@ -120,9 +293,11 @@ class GroupRecord(TreeNode):
         ('Text', '80s', cstr),
         ('ExperimentNumber', 'i'),
         ('GroupCount', 'i'),
-        ('CRC', 'I')
+        ('CRC', 'I'),
+        ('MatrixWidth', 'd'),
+        ('MatrixHeight', 'd'),
     ]
-    size_check = 128
+    size_check = 144
 
 class AmplStateRecord(TreeNode):
     field_info = [

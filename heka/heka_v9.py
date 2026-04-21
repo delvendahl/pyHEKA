@@ -1,42 +1,21 @@
 import struct
-from heka_common import *
+from .heka_common import *
+from .heka_v1000 import BundleItem, BundleHeader, LockInParams, AmplifierState, UserParamDescrType
 
-class BundleItem(Struct):
-    field_info = [
-        ('Start', 'q'),
-        ('Length', 'q'),
-        ('Extension', '8s', cstr),
-    ]
-    size_check = 24
-
-class BundleHeader(Struct):
-    field_info = [
-        ('Signature', '8s', cstr),
-        ('Version', '32s', cstr),
-        ('Time', 'd', heka_time_to_datetime),
-        ('Items', 'i'),
-        ('IsLittleEndian', '?'),
-        ('Reserved', '3s', None),
-        ('FileFormat', 'i'),
-        ('Reserved2', '4s', None),
-        ('BundleItems', BundleItem.array(12)),
-    ]
-    size_check = 352
 
 class TraceRecord(TreeNode):
     field_info = [
         ('Mark', 'i'),
         ('Label', '32s', cstr),
         ('TraceID', 'i'),
-        ('Data', 'q'),
-        ('DataPoints', 'q'),
+        ('Data', 'i'),
+        ('DataPoints', 'i'),
         ('InternalSolution', 'i'),
         ('AverageCount', 'i'),
         ('LeakID', 'i'),
         ('LeakTraces', 'i'),
         ('DataKind', 'h', convertDataKind),
-        ('UseXStart', '?'),
-        ('TcKind', 'b'),
+        ('Filler1', 'h', None),
         ('RecordingMode', 'b', getRecordingMode),
         ('AmplIndex', 'b'),
         ('DataFormat', 'b', getDataFormat),
@@ -70,27 +49,19 @@ class TraceRecord(TreeNode):
         ('CM', 'd'),
         ('GM', 'd'),
         ('Phase', 'd'),
-        ('DataCRC', 'i'),
+        ('DataCRC', 'I'),
         ('CRC', 'I'),
         ('GS', 'd'),
         ('SelfChannel', 'i'),
-        ('InterleaveSize', 'q'),
-        ('InterleaveSkip', 'q'),
+        ('InterleaveSize', 'i'),
+        ('InterleaveSkip', 'i'),
         ('ImageIndex', 'i'),
         ('TrMarkers', '10d'),
         ('SECM_X', 'd'),
         ('SECM_Y', 'd'),
-        ('SECM_Z', 'd'),
-        ('TrHolding', 'd'),
-        ('TcEnumerator', 'i'),
-        ('XTrace', 'i'),
-        ('IntSolValue', 'd'),
-        ('ExtSolValue', 'd'),
-        ('IntSolName', '32s', cstr),
-        ('ExtSolName', '32s', cstr),
-        ('DataPedestal', 'd'),
+        ('SECM_Z', 'd')
     ]
-    size_check = 528
+    size_check = 408
 
 class SweepRecord(TreeNode):
     field_info = [
@@ -101,163 +72,19 @@ class SweepRecord(TreeNode):
         ('SweepCount', 'i'),
         ('Time', 'd', heka_time_to_datetime),
         ('Timer', 'd', timer_timestamp),
-        ('SwUserParams', '2d'),
-        ('PipPressure', 'd'),
-        ('RMSNoise', 'd'),
+        ('SwUserParams', '4d'),
         ('Temperature', 'd'),
         ('OldIntSol', 'i'),
         ('OldExtSol', 'i'),
         ('DigitalIn', 'h'),
         ('SweepKind', 'h'),
-        ('DigitalOut', 'h'),
-        ('Filler1', 'h', None),
+        ('Filler1', 'i', None),
         ('Markers', '4d'),
         ('Filler2', 'i', None),
-        ('CRC', 'I'),
-        ('SwHolding', '16d'),
-        ('SwUserParamEx', '8d'),
+        ('CRC', 'I')
     ]
-    size_check = 352
+    size_check = 160
 
-class UserParamDescrType(Struct):
-    field_info = [
-        ('Name', '32s', cstr),
-        ('Unit', '8s', cstr),
-    ]
-    size_check = 40
-
-class AmplifierState(Struct):
-    field_info = [
-        ('StateVersion', '8s', cstr),
-        ('RealCurrentGain', 'd'),
-        ('RealF2Bandwidth', 'd'),
-        ('F2Frequency', 'd'),
-        ('RsValue', 'd'),
-        ('RsFraction', 'd'),
-        ('GLeak', 'd'),
-        ('CFastAmp1', 'd'),
-        ('CFastAmp2', 'd'),
-        ('CFastTau', 'd'),
-        ('CSlow', 'd'),
-        ('GSeries', 'd'),
-        ('StimDacScale', 'd'),
-        ('CCStimScale', 'd'),
-        ('VHold', 'd'),
-        ('LastVHold', 'd'),
-        ('VpOffset', 'd'),
-        ('VLiquidJunction', 'd'),
-        ('CCIHold', 'd'),
-        ('CSlowStimVolts', 'd'),
-        ('CCTrackVHold', 'd'),
-        ('TimeoutLength', 'd'),
-        ('SearchDelay', 'd'),
-        ('MConductance', 'd'),
-        ('MCapacitance', 'd'),
-        ('SerialNumber', '8s', cchar),
-        ('E9Boards', 'h'),
-        ('CSlowCycles', 'h'),
-        ('IMonAdc', 'h'),
-        ('VMonAdc', 'h'),
-        ('MuxAdc', 'h'),
-        ('TstDac', 'h'),
-        ('StimDac', 'h'),
-        ('StimDacOffset', 'h'),
-        ('MaxDigitalBit', 'h'),
-        ('HasCFastHigh', 'b'),
-        ('CFastHigh', 'b'),
-        ('HasBathSense', 'b'),
-        ('BathSense', 'b'),
-        ('HasF2Bypass', 'b'),
-        ('sF2Mode', 'b'),
-        ('AmplKind', 'b', getAmplifierType),
-        ('IsEpc9N', 'b'),
-        ('ADBoard', 'b', getADBoard),
-        ('BoardVersion', 'b'),
-        ('ActiveE9Board', 'b'),
-        ('Mode', 'b', getClampMode),
-        ('Range', 'b'),
-        ('F2Response', 'b'),
-        ('RsOn', 'b'),
-        ('CSlowRange', 'b', getCSlowRange),
-        ('CCRange', 'b'),
-        ('CCGain', 'b'),
-        ('CSlowToTstDac', 'b'),
-        ('StimPath', 'b'),
-        ('CCTrackTau', 'b'),
-        ('WasClipping', 'b'),
-        ('RepetitiveCSlow', 'b'),
-        ('LastCSlowRange', 'b', getCSlowRange),
-        ('Old1', 'b', None),
-        ('CanCCFast', 'b'),
-        ('CanLowCCRange', 'b'),
-        ('CanHighCCRange', 'b'),
-        ('CanCCTracking', 'b'),
-        ('HasVmonPath', 'b'),
-        ('HasNewCCMode', 'b'),
-        ('Selector', 'b'),
-        ('HoldInverted', 'b'),
-        ('AutoCFast', '?'),
-        ('AutoCSlow', '?'),
-        ('HasVmonX100', 'b'),
-        ('TestDacOn', 'b'),
-        ('QMuxAdcOn', 'b'),
-        ('RealImon1Bandwidth', 'd'),
-        ('StimScale', 'd'),
-        ('Gain', 'b', getAmplifierGain),
-        ('Filter1', 'b'),
-        ('StimFilterOn', 'b'),
-        ('RsSlow', 'b'),
-        ('Old2', 'b', None),
-        ('CCCFastOn', '?'),
-        ('CCFastSpeed', 'b'),
-        ('F2Source', 'b'),
-        ('TestRange', 'b'),
-        ('TestDacPath', 'b'),
-        ('MuxChannel', 'b'),
-        ('MuxGain64', 'b'),
-        ('VmonX100', 'b'),
-        ('IsQuadro', 'b'),
-        ('F1Mode', 'b'),
-        ('Old3', 'b', None),
-        ('StimFilterHz', 'd'),
-        ('RsTau', 'd'),
-        ('DacToAdcDelay', 'd'),
-        ('InputFilterTau', 'd'),
-        ('OutputFilterTau', 'd'),
-        ('VmonFactor', 'd', None),
-        ('CalibDate', '16s', cstr),
-        ('VmonOffset', 'd'),
-        ('EEPROMKind', 'b'),
-        ('VrefX2', 'b'),
-        ('HasVrefX2AndF2Vmon', 'b'),
-        ('Spare1', 'b', None),
-        ('Spare2', 'b', None),
-        ('Spare3', 'b', None),
-        ('Spare4', 'b', None),
-        ('Spare5', 'b', None),
-        ('CCStimDacScale', 'd'),
-        ('VmonFiltBandwidth', 'd'),
-        ('VmonFiltFrequency', 'd'),
-    ]
-    size_check = 400
-
-class LockInParams(Struct):
-    field_info = [
-        ('ExtCalPhase', 'd'),
-        ('ExtCalAtten', 'd'),
-        ('PLPhase', 'd'),
-        ('PLPhaseY1', 'd'),
-        ('PLPhaseY2', 'd'),
-        ('UsedPhaseShift', 'd'),
-        ('UsedAttenuation', 'd'),
-        ('Spares2', '8s', None),
-        ('ExtCalValid', '?'),
-        ('PLPhaseValid', '?'),
-        ('LockInMode', 'b'),
-        ('CalMode', 'b'),
-        ('Spares', '28s', None),
-    ]
-    size_check = 96
 
 class SeriesRecord(TreeNode):
     field_info = [
@@ -271,22 +98,20 @@ class SeriesRecord(TreeNode):
         ('MethodTag', 'i'),
         ('Time', 'd', heka_time_to_datetime),
         ('PageWidth', 'd'),
-        ('UserDescr1', UserParamDescrType.array(2)),
-        ('Filler1', UserParamDescrType.array(2), None),
+        ('UserDescr1', UserParamDescrType.array(4)),
         ('MethodName', '32s', cstr),
         ('PhotoParams1', '4d'),
         ('LockInParams', LockInParams),
         ('AmplifierState', AmplifierState),
         ('Username', '80s', cstr),
         ('PhotoParams2', UserParamDescrType.array(4)),
-        ('Filler2', 'i', None),
+        ('Filler1', 'i', None),
         ('CRC', 'I'),
         ('UserParams2', '4d'),
         ('UserParamDescr2', UserParamDescrType.array(4)),
-        ('ScanParams', '12d'),
-        ('UserDescr2', UserParamDescrType.array(8)),
+        ('ScanParams', '96s', cstr),
     ]
-    size_check = 1728
+    size_check = 1408
 
 class GroupRecord(TreeNode):
     field_info = [
@@ -295,11 +120,9 @@ class GroupRecord(TreeNode):
         ('Text', '80s', cstr),
         ('ExperimentNumber', 'i'),
         ('GroupCount', 'i'),
-        ('CRC', 'I'),
-        ('MatrixWidth', 'd'),
-        ('MatrixHeight', 'd'),
+        ('CRC', 'I')
     ]
-    size_check = 144
+    size_check = 128
 
 class AmplStateRecord(TreeNode):
     field_info = [
@@ -335,7 +158,7 @@ class StimulationRecord(TreeNode):
         ('FileName', '32s', cstr),
         ('AnalName', '32s', cstr),
         ('DataStartSegment', 'i'),
-        ('DataStartTime', 'd', heka_time_to_datetime),
+        ('DataStartTime', 'd'),
         ('SampleInterval', 'd'),
         ('SweepInterval', 'd'),
         ('LeakDelay', 'd'),

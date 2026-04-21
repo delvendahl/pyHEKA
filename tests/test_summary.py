@@ -13,7 +13,7 @@ class TestBundleSummary(unittest.TestCase):
     def setUp(self):
         # Mocking Bundle.__init__ to avoid file operations
         with patch('HekaReader.open', MagicMock()):
-            with patch('heka_v1000.BundleHeader', MagicMock()):
+            with patch('heka.heka_v1000.BundleHeader', MagicMock()):
                 self.bundle = Bundle.__new__(Bundle)
                 self.bundle.file_name = "test_file.dat"
                 self.bundle.file_format = "v1000"
