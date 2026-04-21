@@ -167,5 +167,6 @@ class Bundle(object):
                 print(f"Group {i+1}: {group.Label} ({len(group.children)} series)")
                 if detailed:
                     for j, series in enumerate(group.children):
-                        print(f"    Series {j+1}: {series.Label} (Method: {series.MethodName}, {series.NumberSweeps} sweeps)")
+                        mode = getattr(series.AmplifierState, 'Mode', 'Unknown')
+                        print(f"    Series {j+1}: {series.Label} (Mode: {mode}, {series.NumberSweeps} sweeps)")
         print("-" * 40)
