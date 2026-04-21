@@ -167,6 +167,11 @@ class Bundle(object):
                 print(f"Group {i+1}: {group.Label} ({len(group.children)} series)")
                 if detailed:
                     for j, series in enumerate(group.children):
-                        mode = getattr(series.AmplifierState, 'Mode', 'Unknown')
+                        mode = "Unknown"
+                        try:
+                            # Use RecordingMode of the first trace of the first sweep
+                            mode = series.children[0].children[0].RecordingMode
+                        except (AttributeError, IndexError):
+                            pass
                         print(f"    Series {j+1}: {series.Label} (Mode: {mode}, {series.NumberSweeps} sweeps)")
         print("-" * 40)
