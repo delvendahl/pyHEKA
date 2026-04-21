@@ -79,7 +79,8 @@ class TestBundleSummary(unittest.TestCase):
 
         series1 = MagicMock()
         series1.Label = "Series1"
-        series1.MethodName = "Method1"
+        series1.AmplifierState = MagicMock()
+        series1.AmplifierState.Mode = "VCMode"
         series1.NumberSweeps = 5
 
         group1.children = [series1]
@@ -103,7 +104,7 @@ class TestBundleSummary(unittest.TestCase):
 
         output = captured_output.getvalue()
         self.assertIn("Group 1: Group1", output)
-        self.assertIn("Series 1: Series1 (Method: Method1, 5 sweeps)", output)
+        self.assertIn("Series 1: Series1 (Mode: VCMode, 5 sweeps)", output)
 
 if __name__ == '__main__':
     unittest.main()
