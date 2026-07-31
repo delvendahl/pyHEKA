@@ -1,5 +1,5 @@
 """
-Heka Patchmaster .dat file reader 
+Heka Patchmaster .dat file reader
 Adapted from https://github.com/campagnola/heka_reader
 
 Structure definitions adapted from StimFit hekalib.cpp
@@ -8,22 +8,19 @@ Brief example::
 
     # Load a .dat file
     bundle = Bundle(file_name)
-    
+
     # Select a trace
     trace = bundle.pul[group_ind][series_ind][sweep_ind][trace_ind]
-    
+
     # Print meta-data for this trace
     print(trace)
-    
+
     # Load data for this trace
     data = bundle.data[group_id, series_id, sweep_ind, trace_ind]
 
 """
 
-from heka import Data
-from heka import heka_v1000
-from heka import heka_v2000
-from heka import heka_v9
+from heka import Data, heka_v9, heka_v1000, heka_v2000
 
 
 class Bundle(object):
@@ -33,13 +30,13 @@ class Bundle(object):
 
     def __init__(self, file_name):
         self.file_name = file_name
-        self.fh = open(self.file_name, 'rb')
+        self.fh = open(self.file_name, "rb")
 
-        if self.fh.read(4) != b'DAT2':
-            raise ValueError(f"No support for other files than 'DAT2' format")
+        if self.fh.read(4) != b"DAT2":
+            raise ValueError("No support for other files than 'DAT2' format")
 
         self.fh.seek(8)
-        version = self.fh.read(32).decode('utf-8', errors='ignore').rstrip('\0')
+        version = self.fh.read(32).decode("utf-8", errors="ignore").rstrip("\0")
 
         v9_versions = [
             "v2.11, 14-Mar-2006",
@@ -61,38 +58,38 @@ class Bundle(object):
             "1.5.0 [Build 1061]",
         ]
 
-        v2000_versions = ["1.6.0 [Build 1066]"]
+        v2000_versions = ["1.6.0 [Build 1066]", "1.7.0 [Build 1072]"]
 
         if version in v1000_versions:
-            self.file_format = 'v1000'
+            self.file_format = "v1000"
             self.v = heka_v1000
         elif version in v2000_versions:
-            self.file_format = 'v2000'
+            self.file_format = "v2000"
             self.v = heka_v2000
         elif version in v9_versions:
-            self.file_format = 'v9'
+            self.file_format = "v9"
             self.v = heka_v9
         else:
-            if version.startswith("1.6") or version.startswith("1.7") or version.startswith("1.8"):
-                self.file_format = 'v2000'
+            if version.startswith(("1.6", "1.7", "1.8")):
+                self.file_format = "v2000"
                 self.v = heka_v2000
             else:
-                self.file_format = 'unsupported'
+                self.file_format = "unsupported"
                 raise ValueError(f"Unsupported file version: {version}")
-        
+
         self.item_classes = {
-            '.pul': self.v.Pulsed,
-            '.dat': Data,
-            '.amp': self.v.Amplifier,
-            '.pgf': self.v.Stimulus,
+            ".pul": self.v.Pulsed,
+            ".dat": Data,
+            ".amp": self.v.Amplifier,
+            ".pgf": self.v.Stimulus,
         }
-        
+
         # read Endianness from file header
         self.fh.seek(0)
-        endian = '<'
+        endian = "<"
         self.header = self.v.BundleHeader(self.fh, endian)
         if not self.header.IsLittleEndian:
-            self.endian = '>'
+            self.endian = ">"
             self.fh.seek(0)
             self.header = self.v.BundleHeader(self.fh, self.endian)
 
@@ -104,32 +101,28 @@ class Bundle(object):
             self.catalog[ext] = item
 
     def close(self):
-        if hasattr(self, 'fh') and self.fh:
+        if hasattr(self, "fh") and self.fh:
             self.fh.close()
 
     @property
     def pul(self):
-        """The Pulsed object from this bundle.
-        """
-        return self._get_item_instance('.pul')
-    
+        """The Pulsed object from this bundle."""
+        return self._get_item_instance(".pul")
+
     @property
     def data(self):
-        """The Data object from this bundle.
-        """
-        return self._get_item_instance('.dat')
+        """The Data object from this bundle."""
+        return self._get_item_instance(".dat")
 
     @property
     def amp(self):
-        """The Amplifier object from this bundle.
-        """
-        return self._get_item_instance('.amp')
+        """The Amplifier object from this bundle."""
+        return self._get_item_instance(".amp")
 
     @property
     def pgf(self):
-        """The PGF object from this bundle.
-        """
-        return self._get_item_instance('.pgf')
+        """The PGF object from this bundle."""
+        return self._get_item_instance(".pgf")
 
     def _get_item_instance(self, ext):
         if ext not in self.catalog:
@@ -139,13 +132,12 @@ class Bundle(object):
             cls = self.item_classes[ext]
             item.instance = cls(self, item.Start, item.Length)
         return item.instance
-        
+
     def __repr__(self):
-        return "Bundle(%r)" % list(self.catalog.keys())
+        return f"Bundle({list(self.catalog.keys())!r})"
 
     def summary(self, detailed=False):
-        """Print a summary of the bundle content.
-        """
+        """Print a summary of the bundle content."""
         print(f"File: {self.file_name}")
         print(f"Format: {self.file_format}")
         print(f"Version: {self.header.Version}")
@@ -162,7 +154,7 @@ class Bundle(object):
         if pul is not None:
             print("Data Content:")
             for i, group in enumerate(pul.children):
-                print(f"Group {i+1}: {group.Label} ({len(group.children)} series)")
+                print(f"Group {i + 1}: {group.Label} ({len(group.children)} series)")
                 if detailed:
                     for j, series in enumerate(group.children):
                         mode = "Unknown"
@@ -171,5 +163,7 @@ class Bundle(object):
                             mode = series.children[0].children[0].RecordingMode
                         except (AttributeError, IndexError):
                             pass
-                        print(f"    Series {j+1}: {series.Label} (Mode: {mode}, {len(series)} sweeps)")
+                        print(
+                            f"    Series {j + 1}: {series.Label} (Mode: {mode}, {len(series)} sweeps)"
+                        )
         print("-" * 40)
