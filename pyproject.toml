@@ -2,12 +2,14 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["HekaReader", "HekaReader.heka"]
+
 [project]
-name = "HekaDatReader"
+name = "HekaReader"
 version = "1.0.0"
 description = "Heka Dat File Reader"
-long_description = "Python reader for bundled .dat files from Heka Patchmaster software."
-url = "https://github.com/delvendahl/HekaDatReader"
 readme = "README.md"
 authors = [
     { name = "Igor Delvendahl", email = "igor.delvendahl@physiologie.uni-freiburg.de" },
@@ -16,3 +18,6 @@ dependencies = [
     "numpy>=1.20.0",
 ]
 requires-python = ">=3.9"
+
+[project.urls]
+Homepage = "https://github.com/delvendahl/HekaDatReader"

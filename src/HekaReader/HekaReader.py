@@ -20,7 +20,7 @@ Brief example::
 
 """
 
-from heka import Data, heka_v9, heka_v1000, heka_v2000
+from .heka import Data, heka_v9, heka_v1000, heka_v2000
 
 
 class Bundle:

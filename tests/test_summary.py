@@ -2,8 +2,10 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-# Add the parent directory to sys.path so we can import HekaReader
-sys.path.append("../")
+import os
+
+# Add the src/ directory to sys.path so we can import HekaReader package properly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from HekaReader import Bundle
 
@@ -11,8 +13,8 @@ from HekaReader import Bundle
 class TestBundleSummary(unittest.TestCase):
     def setUp(self):
         # Mocking Bundle.__init__ to avoid file operations
-        with patch("HekaReader.open", MagicMock()):
-            with patch("heka.heka_v1000.BundleHeader", MagicMock()):
+        with patch("HekaReader.HekaReader.open", MagicMock()):
+            with patch("HekaReader.heka.heka_v1000.BundleHeader", MagicMock()):
                 self.bundle = Bundle.__new__(Bundle)
                 self.bundle.file_name = "test_file.dat"
                 self.bundle.file_format = "v1000"
