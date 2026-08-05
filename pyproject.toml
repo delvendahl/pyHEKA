@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HekaDatReader"
-version = "0.0beta"
+version = "1.0.0"
 description = "Heka Dat File Reader"
-long_description = "Python reader for bundled .dat files from Heka Pathcmaster software."
+long_description = "Python reader for bundled .dat files from Heka Patchmaster software."
 url = "https://github.com/delvendahl/HekaDatReader"
 readme = "README.md"
 authors = [

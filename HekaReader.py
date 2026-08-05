@@ -23,7 +23,7 @@ Brief example::
 from heka import Data, heka_v9, heka_v1000, heka_v2000
 
 
-class Bundle(object):
+class Bundle:
     """
     Represent a PATCHMASTER tree file in memory
     """
@@ -31,12 +31,20 @@ class Bundle(object):
     def __init__(self, file_name):
         self.file_name = file_name
         self.fh = open(self.file_name, "rb")
+        try:
+            self._parse()
+        except BaseException:
+            self.fh.close()
+            raise
 
+    def _parse(self):
         if self.fh.read(4) != b"DAT2":
             raise ValueError("No support for other files than 'DAT2' format")
 
         self.fh.seek(8)
-        version = self.fh.read(32).decode("utf-8", errors="ignore").rstrip("\0")
+        version = (
+            self.fh.read(32).decode("ascii", errors="replace").rstrip("\x00").strip()
+        )
 
         v9_versions = [
             "v2.11, 14-Mar-2006",
@@ -58,24 +66,32 @@ class Bundle(object):
             "1.5.0 [Build 1061]",
         ]
 
-        v2000_versions = ["1.6.0 [Build 1066]", "1.7.0 [Build 1072]"]
+        v2000_versions = [
+            "1.6.0 [Build 1066]",
+            "1.7.0 [Build 1072]",
+        ]
 
-        if version in v1000_versions:
-            self.file_format = "v1000"
-            self.v = heka_v1000
-        elif version in v2000_versions:
+        FORMAT_MAP = {
+            "v9": (v9_versions, heka_v9),
+            "v1000": (v1000_versions, heka_v1000),
+            "v2000": (v2000_versions, heka_v2000),
+        }
+
+        self.file_format = None
+        self.v = None
+
+        for fmt, (versions, module) in FORMAT_MAP.items():
+            if version in versions:
+                self.file_format = fmt
+                self.v = module
+                break
+
+        if self.file_format is None and version.startswith(("1.6", "1.7", "1.8")):
             self.file_format = "v2000"
             self.v = heka_v2000
-        elif version in v9_versions:
-            self.file_format = "v9"
-            self.v = heka_v9
-        else:
-            if version.startswith(("1.6", "1.7", "1.8")):
-                self.file_format = "v2000"
-                self.v = heka_v2000
-            else:
-                self.file_format = "unsupported"
-                raise ValueError(f"Unsupported file version: {version}")
+
+        if self.file_format is None:
+            raise ValueError(f"Unsupported file version: {version!r}")
 
         self.item_classes = {
             ".pul": self.v.Pulsed,
@@ -86,8 +102,8 @@ class Bundle(object):
 
         # read Endianness from file header
         self.fh.seek(0)
-        endian = "<"
-        self.header = self.v.BundleHeader(self.fh, endian)
+        self.endian = "<"
+        self.header = self.v.BundleHeader(self.fh, self.endian)
         if not self.header.IsLittleEndian:
             self.endian = ">"
             self.fh.seek(0)
@@ -99,6 +115,13 @@ class Bundle(object):
             item.instance = None
             ext = item.Extension
             self.catalog[ext] = item
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False  # don't suppress exceptions
 
     def close(self):
         if hasattr(self, "fh") and self.fh:
@@ -134,7 +157,13 @@ class Bundle(object):
         return item.instance
 
     def __repr__(self):
-        return f"Bundle({list(self.catalog.keys())!r})"
+        return (
+            f"Bundle(file_name={self.file_name!r}, "
+            f"format={self.file_format!r}, "
+            f"endian={self.endian!r}, "
+            f"version={self.header.Version!r}, "
+            f"items={list(self.catalog.keys())!r})"
+        )
 
     def summary(self, detailed=False):
         """Print a summary of the bundle content."""
@@ -147,6 +176,8 @@ class Bundle(object):
         pgf = self.pgf
         if pgf is not None:
             protocols = [p.EntryName for p in pgf.children]
+            # get only unique protocols
+            protocols = list(dict.fromkeys(protocols))
             print(f"PGF Protocols: {', '.join(protocols)}")
             print("-" * 40)
 

@@ -1,19 +1,18 @@
-
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
-import sys
-import os
 
-# Add the current directory to sys.path so we can import HekaReader
-sys.path.append(os.getcwd())
+# Add the parent directory to sys.path so we can import HekaReader
+sys.path.append("../")
 
 from HekaReader import Bundle
+
 
 class TestBundleSummary(unittest.TestCase):
     def setUp(self):
         # Mocking Bundle.__init__ to avoid file operations
-        with patch('HekaReader.open', MagicMock()):
-            with patch('heka.heka_v1000.BundleHeader', MagicMock()):
+        with patch("HekaReader.open", MagicMock()):
+            with patch("heka.heka_v1000.BundleHeader", MagicMock()):
                 self.bundle = Bundle.__new__(Bundle)
                 self.bundle.file_name = "test_file.dat"
                 self.bundle.file_format = "v1000"
@@ -29,27 +28,32 @@ class TestBundleSummary(unittest.TestCase):
         stim2 = MagicMock()
         stim2.EntryName = "Protocol2"
         mock_pgf.children = [stim1, stim2]
-        self.bundle._get_item_instance = MagicMock(side_effect=lambda ext: mock_pgf if ext == '.pgf' else None)
+        self.bundle._get_item_instance = MagicMock(
+            side_effect=lambda ext: mock_pgf if ext == ".pgf" else None
+        )
 
         # Mocking pul (Pulsed)
         mock_pul = MagicMock()
         group1 = MagicMock()
         group1.Label = "Group1"
-        group1.children = [MagicMock(), MagicMock()] # 2 series
+        group1.children = [MagicMock(), MagicMock()]  # 2 series
         group2 = MagicMock()
         group2.Label = "Group2"
-        group2.children = [MagicMock()] # 1 series
+        group2.children = [MagicMock()]  # 1 series
         mock_pul.children = [group1, group2]
 
         def mock_get_item(ext):
-            if ext == '.pgf': return mock_pgf
-            if ext == '.pul': return mock_pul
+            if ext == ".pgf":
+                return mock_pgf
+            if ext == ".pul":
+                return mock_pul
             return None
 
         self.bundle._get_item_instance = MagicMock(side_effect=mock_get_item)
 
         # We need to capture stdout
         from io import StringIO
+
         captured_output = StringIO()
         sys.stdout = captured_output
 
@@ -92,13 +96,16 @@ class TestBundleSummary(unittest.TestCase):
         mock_pul.children = [group1]
 
         def mock_get_item(ext):
-            if ext == '.pgf': return mock_pgf
-            if ext == '.pul': return mock_pul
+            if ext == ".pgf":
+                return mock_pgf
+            if ext == ".pul":
+                return mock_pul
             return None
 
         self.bundle._get_item_instance = MagicMock(side_effect=mock_get_item)
 
         from io import StringIO
+
         captured_output = StringIO()
         sys.stdout = captured_output
 
@@ -111,5 +118,6 @@ class TestBundleSummary(unittest.TestCase):
         self.assertIn("Group 1: Group1", output)
         self.assertIn("Series 1: Series1 (Mode: VClamp, 5 sweeps)", output)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

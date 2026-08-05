@@ -1,21 +1,21 @@
-import numpy as np
-import re
-import struct
 import collections
 import datetime
+import re
+import struct
+
+import numpy as np
 
 
 def cstr(byt):
-    """Convert C string bytes to python string.
-    """
-    ind = byt.find(b'\0')
+    """Convert C string bytes to python string."""
+    ind = byt.find(b"\0")
     if ind == -1:
         return byt
-    return byt[:ind].decode('utf-8', errors='ignore')
+    return byt[:ind].decode("utf-8", errors="ignore")
+
 
 def cbyte(byt):
-    """Convert C string byte to python integer.
-    """
+    """Convert C string byte to python integer."""
     if isinstance(byt, int):
         return byt
     try:
@@ -23,14 +23,16 @@ def cbyte(byt):
     except (ValueError, IndexError):
         return byt
 
+
 def cchar(byt):
-    """Convert C char byte to python string.
-    """
-    return byt.decode('utf-8', errors='ignore')
+    """Convert C char byte to python string."""
+    return byt.decode("utf-8", errors="ignore")
+
 
 def heka_time_to_datetime(stored_time) -> datetime.datetime:
-    ''' convert HEKA time to a datetime object '''
-    HekaEpoch = datetime.datetime(1990, 1, 1)
+    """convert HEKA time to a datetime object"""
+    utc = datetime.timezone.utc
+    HekaEpoch = datetime.datetime(1990, 1, 1, tzinfo=utc)
 
     try:
         # Optimization: in most cases it's just HekaEpoch + stored_time
@@ -39,17 +41,17 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
         # --- HEKA 1990 epoch ---
         c = HekaEpoch + datetime.timedelta(seconds=stored_time)
 
-        now = datetime.datetime.now()
-        lower = datetime.datetime(1990, 1, 1)
+        now = datetime.datetime.now(tz=utc)
+        lower = datetime.datetime(1990, 1, 1, tzinfo=utc)
         upper = now + datetime.timedelta(days=7)
 
         if lower < c < upper:
-            return c
+            return c.replace(tzinfo=None)
 
-        WinEpoch = datetime.datetime(1601, 1, 1)
-        MacEpoch = datetime.datetime(1904, 1, 1)
+        WinEpoch = datetime.datetime(1601, 1, 1, tzinfo=utc)
+        MacEpoch = datetime.datetime(1904, 1, 1, tzinfo=utc)
         windows_offset = 7980681600.0
-        seconds_1904_to_1990 = 2713910400.0 # (HekaEpoch - MacEpoch).total_seconds()
+        seconds_1904_to_1990 = 2713910400.0  # (HekaEpoch - MacEpoch).total_seconds()
 
         candidates = []
         wrap = 2**32
@@ -57,23 +59,25 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
             t = stored_time + windows_offset
             candidates.append(WinEpoch + datetime.timedelta(seconds=t))
 
-        candidates.append(c) # already there but for completeness
+        candidates.append(c)  # already there but for completeness
 
         t = stored_time - seconds_1904_to_1990
         candidates.append(MacEpoch + datetime.timedelta(seconds=t))
 
         for c in candidates:
             if lower < c < upper:
-                return c
+                return c.replace(tzinfo=None)
 
-        return candidates[0]
+        return candidates[0].replace(tzinfo=None)
 
     except OverflowError:
-        return 'Invalid time value: {}'.format(stored_time)
-    
+        return f"Invalid time value: {stored_time}"
+
+
 def timer_timestamp(total_seconds: float) -> datetime.timedelta:
-    ''' Converts seconds to a datetime timedelta object '''
+    """Converts seconds to a datetime timedelta object"""
     return datetime.timedelta(seconds=total_seconds)
+
 
 def getFromList(lst, index):
     try:
@@ -81,66 +85,126 @@ def getFromList(lst, index):
     except IndexError:
         return f"Unknown (value: {index})"
 
+
 def getAmplifierType(byte):
-    return getFromList(["EPC7", "EPC8", "EPC9", "EPC10", "EPC10Plus", "EPC10_USB"], byte)
+    return getFromList(
+        ["EPC7", "EPC8", "EPC9", "EPC10", "EPC10Plus", "EPC10_USB"], byte
+    )
+
 
 def getADBoard(byte):
     return getFromList(["ITC16", "ITC18", "LIH1600", "LIH 8+8"], byte)
 
+
 def getRecordingMode(byte):
-    return getFromList(["InOut", "OnCell", "OutOut", "WholeCell", "CClamp", "VClamp", "NoMode"], byte)
+    return getFromList(
+        ["InOut", "OnCell", "OutOut", "WholeCell", "CClamp", "VClamp", "NoMode"], byte
+    )
+
 
 def getDataFormat(byte):
     return getFromList(["int16", "int32", "real32", "real64"], byte)
 
+
 def getSegmentClass(byte):
-    return getFromList(["Constant", "Ramp", "Continuous", "ConstSine", "Squarewave", "Chirpwave"], byte)
+    return getFromList(
+        ["Constant", "Ramp", "Continuous", "ConstSine", "Squarewave", "Chirpwave"], byte
+    )
+
 
 def getStoreType(byte):
     return getFromList(["NoStore", "Store", "StoreStart", "StoreEnd"], byte)
 
+
 def getIncrementMode(byte):
-    return getFromList(["Inc", "Dec", "IncInterleaved", "DecInterleaved",
-                        "Alternate", "LogInc", "LogDec", "LogIncInterleaved",
-                        "LogDecInterleaved", "LogAlternate", "Toggle"], byte)
+    return getFromList(
+        [
+            "Inc",
+            "Dec",
+            "IncInterleaved",
+            "DecInterleaved",
+            "Alternate",
+            "LogInc",
+            "LogDec",
+            "LogIncInterleaved",
+            "LogDecInterleaved",
+            "LogAlternate",
+            "Toggle",
+        ],
+        byte,
+    )
+
 
 def getSourceType(byte):
     return getFromList(["Constant", "Hold", "Parameter"], byte)
+
 
 def getAmplifierGain(byte):
     """
     Units: V/A
     """
     # Original units: mV/pA
-    return getFromList([1e-3/1e-12 * x for x in
-                       [0.005, 0.010, 0.020, 0.050, 0.1, 0.2,
-                        0.5, 1, 2, 5, 10, 20,
-                        50, 100, 200, 500, 1000, 2000]], byte)
+    return getFromList(
+        [
+            1e-3 / 1e-12 * x
+            for x in [
+                0.005,
+                0.010,
+                0.020,
+                0.050,
+                0.1,
+                0.2,
+                0.5,
+                1,
+                2,
+                5,
+                10,
+                20,
+                50,
+                100,
+                200,
+                500,
+                1000,
+                2000,
+            ]
+        ],
+        byte,
+    )
+
 
 def convertDataFormatToNP(dataFormat):
-    d = {"int16": np.int16,
-         "int32": np.int32,
-         "real32": np.float32,
-         "real64": np.float64}
+    d = {
+        "int16": np.int16,
+        "int32": np.int32,
+        "real32": np.float32,
+        "real64": np.float64,
+    }
     return d[dataFormat]
+
 
 def getCSlowRange(byte):
     return getFromList(["Off", "30 pF", "100 pF", "1000 pF"], byte)
 
+
 def getClampMode(byte):
     return getFromList(["TestMode", "VCMode", "CCMode", "NoMode"], byte)
+
 
 def getAmplMode(byte):
     return getFromList(["Any", "VCMode", "CCMode", "IDensityMode"], byte)
 
+
 def getLeakHoldMode(byte):
     return getFromList(["Labs", "Lrel", "LabsLH", "LrelLH"], byte)
+
 
 def getLeakStoreType(byte):
     return getFromList(["None", "StoreAvg", "StoreEach", "NoStore"], byte)
 
+
 def getADCMode(byte):
     return getFromList(["AdcOff", "Analog", "Digitals", "Digital", "AdcVirtual"], byte)
+
 
 def convertDataKind(byte):
     return {
@@ -149,8 +213,9 @@ def convertDataKind(byte):
         "IsVirtual": bool(byte & 4),
         "IsImon": bool(byte & 8),
         "IsVmon": bool(byte & 16),
-        "Clip": bool(byte & 32)
+        "Clip": bool(byte & 32),
     }
+
 
 def convertStimToDacID(byte):
     return {
@@ -161,39 +226,43 @@ def convertStimToDacID(byte):
         "UseForWavelength": bool(byte & 16),
         "UseScaling": bool(byte & 32),
         "UseForChirp": bool(byte & 64),
-        "UseForImaging": bool(byte & 128)
+        "UseForImaging": bool(byte & 128),
     }
+
 
 def getSquareKind(byte):
     return getFromList(["Common Frequency"], byte)
 
+
 def getChirpKind(byte):
     return getFromList(["Linear", "Exponential", "Spectroscopic"], byte)
+
 
 def getTriggerKind(byte):
     return getFromList(["None", "Series", "Sweep", "SweepNoLeak"], byte)
 
-class Struct():
+
+class Struct:
     field_info = None
     size_check = None
     _fields_parsed = None
 
-    def __init__(self, data, endian='<'):
+    def __init__(self, data, endian="<"):
         field_info = self._field_info()
         if not isinstance(data, (str, bytes)):
             data = data.read(self._le_struct.size)
 
-        struct_obj = self._le_struct if endian == '<' else self._be_struct
+        struct_obj = self._le_struct if endian == "<" else self._be_struct
         items = struct_obj.unpack(data)
 
         i = 0
         for name, fmt, func in field_info:
-            if len(fmt) == 1 or fmt[-1] == 's':
+            if len(fmt) == 1 or fmt[-1] == "s":
                 item = items[i]
                 i += 1
             else:
                 n = int(fmt[:-1])
-                item = items[i:i+n]
+                item = items[i : i + n]
                 i += n
 
             if func is not True:
@@ -216,7 +285,7 @@ class Struct():
         if cls._fields_parsed is not None:
             return cls._fields_parsed
 
-        fmt = ''
+        fmt = ""
         fields = []
         if cls.field_info is not None:
             for items in cls.field_info:
@@ -228,19 +297,19 @@ class Struct():
 
                 if isinstance(ifmt, type) and issubclass(ifmt, Struct):
                     func = (ifmt, func)
-                    ifmt = '%ds' % ifmt.size()
-                elif re.match(r'\d*[xcbB?hHiIlLqQfdspP]', ifmt) is None:
-                    raise TypeError('Unsupported format string "%s"' % ifmt)
+                    ifmt = f"{ifmt.size()}s"
+                elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
+                    raise TypeError(f'Unsupported format string "{ifmt}"')
 
                 fields.append((name, ifmt, func))
                 fmt += ifmt
-        cls._le_struct = struct.Struct('<' + fmt)
-        cls._be_struct = struct.Struct('>' + fmt)
+        cls._le_struct = struct.Struct("<" + fmt)
+        cls._be_struct = struct.Struct(">" + fmt)
         cls._fields_parsed = fields
         if cls.size_check is not None:
-            assert cls._le_struct.size == cls.size_check, \
-                "{} expected vs. {}".format(
-                    cls.size_check, cls._le_struct.size)
+            assert cls._le_struct.size == cls.size_check, (
+                f"{cls.size_check} expected vs. {cls._le_struct.size}"
+            )
         return fields
 
     @classmethod
@@ -250,21 +319,26 @@ class Struct():
 
     @classmethod
     def array(cls, x):
-        return type(cls.__name__+'[%d]' % x, (StructArray,),
-                    {'item_struct': cls, 'array_size': x})
+        return type(
+            f"{cls.__name__}[{x}]",
+            (StructArray,),
+            {"item_struct": cls, "array_size": x},
+        )
 
     def __str__(self, indent=0):
-        indent_str = '    '*indent
-        r = indent_str + '%s(\n' % self.__class__.__name__
+        indent_str = "    " * indent
+        r = indent_str + f"{self.__class__.__name__}(\n"
         for name, _, _ in self._field_info():
             if hasattr(self, name):
                 v = getattr(self, name)
                 if isinstance(v, Struct):
-                    r += indent_str + '    %s = %s\n' % \
-                        (name, v.__str__(indent=indent+1).lstrip())
+                    r += (
+                        indent_str
+                        + f"    {name} = {v.__str__(indent=indent + 1).lstrip()}\n"
+                    )
                 else:
-                    r += indent_str + '    %s = %r\n' % (name, v)
-        r += indent_str + ')'
+                    r += indent_str + f"    {name} = {v!r}\n"
+        r += indent_str + ")"
         return r
 
     def __repr__(self, indent=0):
@@ -283,17 +357,18 @@ class Struct():
                     fields[name] = v
         return fields
 
+
 class StructArray(Struct):
     item_struct = None
     array_size = None
 
-    def __init__(self, data, endian='<'):
+    def __init__(self, data, endian="<"):
         if not isinstance(data, (str, bytes)):
             data = data.read(self.size())
         items = []
         isize = self.item_struct.size()
         for i in range(self.array_size):
-            d = data[i*isize:(i+1)*isize]
+            d = data[i * isize : (i + 1) * isize]
             items.append(self.item_struct(d, endian))
         self.array = items
 
@@ -305,11 +380,12 @@ class StructArray(Struct):
         return cls.item_struct.size() * cls.array_size
 
     def __repr__(self, indent=0):
-        r = '    '*indent + '%s(\n' % self.__class__.__name__
+        r = "    " * indent + f"{self.__class__.__name__}(\n"
         for item in self.array:
-            r += item.__repr__(indent=indent+1) + ',\n'
-        r += '    '*indent + ')'
+            r += item.__repr__(indent=indent + 1) + ",\n"
+        r += "    " * indent + ")"
         return r
+
 
 class TreeNode(Struct):
     def __init__(self, fh, pul, level=0):
@@ -321,13 +397,13 @@ class TreeNode(Struct):
         structsize = self.size()
         data = fh.read(realsize)
         if len(data) < structsize:
-            data = data + b'\0'*(structsize - len(data))
+            data = data + b"\0" * (structsize - len(data))
         else:
             data = data[:structsize]
 
         Struct.__init__(self, data, endian)
 
-        nchild = struct.unpack(endian + 'i', fh.read(4))[0]
+        nchild = struct.unpack(endian + "i", fh.read(4))[0]
 
         level += 1
         if level >= len(pul.rectypes):
@@ -346,13 +422,14 @@ class TreeNode(Struct):
         return self.children.__iter__()
 
     def __repr__(self, indent=0):
-        ind = '    '*indent
+        ind = "    " * indent
         srep = Struct.__repr__(self, indent)[:-1]
-        srep += ind + '    children = %d,\n' % len(self)
-        srep += ind + ')'
+        srep += ind + f"    children = {len(self)},\n"
+        srep += ind + ")"
         return srep
 
-class Data(object):
+
+class Data:
     def __init__(self, bundle, offset=0, size=None):
         self.bundle = bundle
         self.offset = offset
@@ -360,13 +437,15 @@ class Data(object):
     def __getitem__(self, *args):
         index = args[0]
         if not isinstance(index, tuple) or len(index) != 4:
-            raise IndexError("Index must be a tuple of length 4 (group, series, sweep, trace)")
+            raise IndexError(
+                "Index must be a tuple of length 4 (group, series, sweep, trace)"
+            )
         pul = self.bundle.pul
         trace = pul[index[0]][index[1]][index[2]][index[3]]
         fh = self.bundle.fh
         fh.seek(trace.Data)
         dtype = np.dtype(convertDataFormatToNP(trace.DataFormat))
-        if not trace.DataKind['IsLittleEndian']:
-            dtype = dtype.newbyteorder('>')
+        if not trace.DataKind["IsLittleEndian"]:
+            dtype = dtype.newbyteorder(">")
         data = np.fromfile(fh, count=trace.DataPoints, dtype=dtype)
         return (data * trace.DataScaler).astype(np.float64)
