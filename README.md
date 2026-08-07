@@ -1,7 +1,7 @@
 # HekaReader
 
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GNU AGPL](https://img.shields.io/badge/License-GNU-yellow.svg)](LICENSE)
 
 `HekaReader` is a lightweight, efficient, and easy-to-use Python library for parsing and reading bundled `.dat` files created by HEKA Patchmaster or Patchmaster Next software. It supports several HEKA file versions including **v9**, **v1000**, and **v2000** formats.
 
