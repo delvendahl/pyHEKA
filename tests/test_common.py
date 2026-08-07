@@ -1,8 +1,16 @@
-import unittest
 import datetime
-import struct
 import io
+import os
+import struct
+import sys
+import unittest
+
 import numpy as np
+
+# Add the src/ directory to sys.path so we can import HekaReader package properly
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 from HekaReader.heka.heka_common import (
     cstr,
@@ -156,7 +164,9 @@ class TestStructAndArray(unittest.TestCase):
         DummyArray = DummyStruct.array(2)
         self.assertEqual(DummyArray.size(), 32)
 
-        data = struct.pack("<i10s?c", 1, b"one\0\0\0\0\0\0\0", True, b"\0") + struct.pack("<i10s?c", 2, b"two\0\0\0\0\0\0\0", False, b"\0")
+        data = struct.pack(
+            "<i10s?c", 1, b"one\0\0\0\0\0\0\0", True, b"\0"
+        ) + struct.pack("<i10s?c", 2, b"two\0\0\0\0\0\0\0", False, b"\0")
         arr = DummyArray(data)
 
         self.assertEqual(len(arr.array), 2)
