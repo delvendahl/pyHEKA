@@ -20,7 +20,117 @@ Brief example::
 
 """
 
-from .heka import Data, heka_v9, heka_v1000, heka_v2000
+from heka import Data, heka_v9, heka_v1000, heka_v2000
+
+import re
+
+
+def read_bundle_header_version(filepath):
+    """
+    Read the version string from the bundle header of a HEKA .dat file.
+    The version string is at byte offset 8, length 32 (null-terminated).
+    """
+    with open(filepath, "rb") as fh:
+        fh.seek(0)
+        # Read signature (8s) + version (32s)
+        raw = fh.read(40)
+        signature = raw[:8].split(b"\x00")[0].decode("utf-8", errors="ignore")
+        version_bytes = raw[8:40]
+        version_str = version_bytes.split(b"\x00")[0].decode("utf-8", errors="ignore")
+    return signature, version_str
+
+
+def parse_version_number(version_str):
+    """
+    Parse a HEKA version string into a comparable tuple.
+
+    Handles two formats:
+      Old-style: "v2x90.3, 19-Mar-2018"  →  (2, 90, 3)
+      Old-style: "v2x65, 19-Dec-2011"    →  (2, 65, 0)
+      Old-style: "v2.11, 14-Mar-2006"    →  (2, 11, 0)
+      New-style: "1.5.0 [Build 1061]"    →  (1, 5, 0)  (new-style flag)
+      New-style: "1.7.0 [Build 1072]"    →  (1, 7, 0)  (new-style flag)
+
+    Returns (version_tuple, is_new_style)
+    """
+    version_str = version_str.strip()
+
+    # --- New-style: "X.Y.Z [Build NNNN]" ---
+    # These are Patchmaster NEXT versions (1.x.x)
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)", version_str)
+    if m:
+        major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        return (major, minor, patch), True
+
+    # --- Old-style: "v2x90.3, ..." or "v2x65, ..." or "v2.11, ..." ---
+    # Strip leading 'v' and take everything before the comma
+    core = version_str.split(",")[0].strip()
+    core = core.removeprefix("v")
+
+    # Replace 'x' with '.' (v2x65 → 2.65, v2x90.3 → 2.90.3)
+    core = core.replace("x", ".")
+
+    parts = core.split(".")
+    nums = []
+    for p in parts:
+        try:
+            nums.append(int(p))
+        except ValueError:
+            nums.append(0)
+
+    # Pad to at least 3 elements
+    while len(nums) < 3:
+        nums.append(0)
+
+    return tuple(nums[:3]), False
+
+
+def determine_format_version(version_str):
+    """
+    Determine the HEKA file format version (v9, v1000, or v2000)
+    from the bundle header version string.
+
+    Rules (based on known version mappings):
+      Old-style v2x90.2 and below  → v9
+      Old-style v2x90.3 and above  → v1000
+      New-style 1.5.0 and below    → v1000
+      New-style 1.6.0 and above    → v2000
+
+    Returns an integer: 9, 1000, or 2000.
+    """
+    (major, minor, patch), is_new_style = parse_version_number(version_str)
+
+    if is_new_style:
+        # New-style "1.x.y [Build NNNN]" — Patchmaster NEXT
+        if (major, minor) >= (1, 6):
+            return 2000
+        else:
+            return 1000
+    else:
+        # Old-style "v2xNN" or "v2.NN"
+        # v2x90.2 and below → v9
+        # v2x90.3 and above → v1000
+        if (major, minor, patch) <= (2, 90, 2):
+            return 9
+        else:
+            return 1000
+
+
+def get_file_format_version(filepath):
+    """
+    High-level function: read a .dat file and return the format version
+    as an integer (9, 1000, or 2000).
+    """
+    signature, version_str = read_bundle_header_version(filepath)
+
+    if signature != "DAT2":
+        raise ValueError(
+            f"Unsupported file signature '{signature}'. "
+            f"Only 'DAT2' (bundled) files are supported. "
+            f"DAT1 (unbundled) files must be converted in Patchmaster first."
+        )
+
+    return determine_format_version(version_str)
 
 
 class Bundle:
@@ -38,60 +148,15 @@ class Bundle:
             raise
 
     def _parse(self):
-        if self.fh.read(4) != b"DAT2":
-            raise ValueError("No support for other files than 'DAT2' format")
-
-        self.fh.seek(8)
-        version = (
-            self.fh.read(32).decode("ascii", errors="replace").rstrip("\x00").strip()
-        )
-
-        v9_versions = [
-            "v2.11, 14-Mar-2006",
-            "v2x65, 19-Dec-2011",
-        ]
-        # v2x90.2, 22-Nov-2016 seems to have yet another format
-
-        v1000_versions = [
-            "v2x90.3, 19-Mar-2018",
-            "v2x90.4, 30-Oct-2018",
-            "v2x90.5, 09-Apr-2019",
-            "v2x91, 23-Feb-2021",
-            "v2x91, 06-Jul-2020",
-            "v2x92, 23-February-2023",
-            "v2x92, 1-June-2023",
-            "1.2.0 [Build 1469]",
-            "1.3.0 [Build 1008]",
-            "1.4.1 [Build 1036]",
-            "1.5.0 [Build 1061]",
-        ]
-
-        v2000_versions = [
-            "1.6.0 [Build 1066]",
-            "1.7.0 [Build 1072]",
-        ]
+        format = get_file_format_version(self.file_name)
 
         FORMAT_MAP = {
-            "v9": (v9_versions, heka_v9),
-            "v1000": (v1000_versions, heka_v1000),
-            "v2000": (v2000_versions, heka_v2000),
+            "v9": heka_v9,
+            "v1000": heka_v1000,
+            "v2000": heka_v2000,
         }
-
-        self.file_format = None
-        self.v = None
-
-        for fmt, (versions, module) in FORMAT_MAP.items():
-            if version in versions:
-                self.file_format = fmt
-                self.v = module
-                break
-
-        if self.file_format is None and version.startswith(("1.6", "1.7", "1.8")):
-            self.file_format = "v2000"
-            self.v = heka_v2000
-
-        if self.file_format is None:
-            raise ValueError(f"Unsupported file version: {version!r}")
+        self.file_format = f"v{format}"
+        self.v = FORMAT_MAP.get(self.file_format)
 
         self.item_classes = {
             ".pul": self.v.Pulsed,
