@@ -22,7 +22,7 @@ Brief example::
 
 import re
 
-from heka import Data, heka_v9, heka_v1000, heka_v2000
+from .heka import Data, heka_v9, heka_v1000, heka_v2000
 
 
 def read_bundle_header_version(filepath):
