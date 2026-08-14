@@ -23,7 +23,6 @@ from .heka_common import (
     getRecordingMode,
     heka_time_to_datetime,
     struct_field,
-    timer_timestamp,
     convertDataKind,
 )
 from .heka_v1000 import (

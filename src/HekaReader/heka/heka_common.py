@@ -4,7 +4,6 @@ import datetime
 import re
 import struct
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
 
 import numpy as np
 
@@ -287,7 +286,9 @@ class Struct:
             return
 
         if not dataclasses.is_dataclass(cls):
-            raise TypeError(f"Class '{cls.__name__}' must be decorated with @dataclass.")
+            raise TypeError(
+                f"Class '{cls.__name__}' must be decorated with @dataclass."
+            )
 
         fmt = ""
         cls._fields_parsed = []
@@ -460,8 +461,7 @@ class RootNode(TreeNode):
         levels = struct.unpack(self.endian + "i", fh.read(4))[0]
 
         self.level_sizes = [
-            struct.unpack(self.endian + "i", fh.read(4))[0]
-            for _ in range(levels)
+            struct.unpack(self.endian + "i", fh.read(4))[0] for _ in range(levels)
         ]
 
         super().__init__(fh, self)
