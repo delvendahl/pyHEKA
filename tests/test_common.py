@@ -4,6 +4,7 @@ import os
 import struct
 import sys
 import unittest
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -39,9 +40,11 @@ from HekaReader.heka.heka_common import (
     getSquareKind,
     getChirpKind,
     getTriggerKind,
+    struct_field,
     Struct,
     StructArray,
     TreeNode,
+    RootNode,
 )
 
 
@@ -127,13 +130,12 @@ class TestHekaCommonHelpers(unittest.TestCase):
 
 
 # Create a concrete Struct class for testing
+@dataclass(init=False, repr=False)
 class DummyStruct(Struct):
-    field_info = [
-        ("id", "i"),
-        ("name", "10s", cstr),
-        ("flag", "?"),
-        ("padding", "c", None),
-    ]
+    id: int = struct_field("i")
+    name: str = struct_field("10s", cstr)
+    flag: bool = struct_field("?")
+    padding: bytes = struct_field("c", None)
     size_check = 16
 
 
@@ -159,6 +161,14 @@ class TestStructAndArray(unittest.TestCase):
         self.assertEqual(fields["name"], "alice")
         self.assertEqual(fields["flag"], True)
 
+    def test_non_dataclass_raises_type_error(self):
+        class InvalidStruct(Struct):
+            pass
+
+        with self.assertRaises(TypeError) as ctx:
+            InvalidStruct._init_struct_formats()
+        self.assertIn("must be decorated with @dataclass", str(ctx.exception))
+
     def test_struct_array(self):
         # Array of 2 DummyStructs
         DummyArray = DummyStruct.array(2)
@@ -169,11 +179,15 @@ class TestStructAndArray(unittest.TestCase):
         ) + struct.pack("<i10s?c", 2, b"two\0\0\0\0\0\0\0", False, b"\0")
         arr = DummyArray(data)
 
-        self.assertEqual(len(arr.array), 2)
+        self.assertEqual(len(arr), 2)
         self.assertEqual(arr[0].id, 1)
         self.assertEqual(arr[0].name, "one")
         self.assertEqual(arr[1].id, 2)
         self.assertEqual(arr[1].name, "two")
+
+        # Test iteration
+        ids = [item.id for item in arr]
+        self.assertEqual(ids, [1, 2])
 
         rep = repr(arr)
         self.assertIn("DummyStruct[2]", rep)

@@ -1,10 +1,16 @@
 import collections
+import dataclasses
 import datetime
 import re
 import struct
-import dataclasses
+from dataclasses import dataclass, field
 
 import numpy as np
+
+
+def struct_field(fmt, func=True):
+    """Helper to create a dataclass field with struct format metadata."""
+    return field(metadata={"fmt": fmt, "func": func})
 
 
 def cstr(byt):
@@ -36,10 +42,6 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
     HekaEpoch = datetime.datetime(1990, 1, 1, tzinfo=utc)
 
     try:
-        # Optimization: in most cases it's just HekaEpoch + stored_time
-        # and it falls within reasonable range.
-
-        # --- HEKA 1990 epoch ---
         c = HekaEpoch + datetime.timedelta(seconds=stored_time)
 
         now = datetime.datetime.now(tz=utc)
@@ -52,7 +54,7 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
         WinEpoch = datetime.datetime(1601, 1, 1, tzinfo=utc)
         MacEpoch = datetime.datetime(1904, 1, 1, tzinfo=utc)
         windows_offset = 7980681600.0
-        seconds_1904_to_1990 = 2713910400.0  # (HekaEpoch - MacEpoch).total_seconds()
+        seconds_1904_to_1990 = 2713910400.0
 
         candidates = []
         wrap = 2**32
@@ -60,7 +62,7 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
             t = stored_time + windows_offset
             candidates.append(WinEpoch + datetime.timedelta(seconds=t))
 
-        candidates.append(c)  # already there but for completeness
+        candidates.append(c)
 
         t = stored_time - seconds_1904_to_1990
         candidates.append(MacEpoch + datetime.timedelta(seconds=t))
@@ -141,10 +143,7 @@ def getSourceType(byte):
 
 
 def getAmplifierGain(byte):
-    """
-    Units: V/A
-    """
-    # Original units: mV/pA
+    """Units: V/A"""
     return getFromList(
         [
             1e-3 / 1e-12 * x
@@ -244,8 +243,6 @@ def getTriggerKind(byte):
 
 
 class Struct:
-    field_info = None
-    size_check = None
     _fields_parsed = None
 
     def __init__(self, data, endian="<"):
@@ -288,46 +285,33 @@ class Struct:
         if cls.__dict__.get("_fields_parsed") is not None:
             return
 
+        if not dataclasses.is_dataclass(cls):
+            raise TypeError(
+                f"Class '{cls.__name__}' must be decorated with @dataclass."
+            )
+
         fmt = ""
         cls._fields_parsed = []
 
-        if dataclasses.is_dataclass(cls):
-            for f in dataclasses.fields(cls):
-                name = f.name
-                ifmt = f.metadata.get("fmt")
-                if ifmt is None:
-                    continue
-                func = f.metadata.get("func", True)
+        for f in dataclasses.fields(cls):
+            name = f.name
+            ifmt = f.metadata.get("fmt")
+            if ifmt is None:
+                continue
+            func = f.metadata.get("func", True)
 
-                if isinstance(ifmt, type) and issubclass(ifmt, Struct):
-                    func = (ifmt, func)
-                    ifmt = f"{ifmt.size()}s"
-                elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
-                    raise TypeError(f'Unsupported format string "{ifmt}"')
+            if isinstance(ifmt, type) and issubclass(ifmt, Struct):
+                func = (ifmt, func)
+                ifmt = f"{ifmt.size()}s"
+            elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
+                raise TypeError(f'Unsupported format string "{ifmt}"')
 
-                cls._fields_parsed.append((name, ifmt, func))
-                fmt += ifmt
-        else:
-            if cls.field_info is not None:
-                for items in cls.field_info:
-                    if len(items) == 3:
-                        name, ifmt, func = items
-                    else:
-                        name, ifmt = items
-                        func = True
-
-                    if isinstance(ifmt, type) and issubclass(ifmt, Struct):
-                        func = (ifmt, func)
-                        ifmt = f"{ifmt.size()}s"
-                    elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
-                        raise TypeError(f'Unsupported format string "{ifmt}"')
-
-                    cls._fields_parsed.append((name, ifmt, func))
-                    fmt += ifmt
+            cls._fields_parsed.append((name, ifmt, func))
+            fmt += ifmt
 
         cls._le_struct = struct.Struct("<" + fmt)
         cls._be_struct = struct.Struct(">" + fmt)
-        if cls.size_check is not None:
+        if hasattr(cls, "size_check") and cls.size_check is not None:
             assert cls._le_struct.size == cls.size_check, (
                 f"{cls.size_check} expected vs. {cls._le_struct.size}"
             )
@@ -399,6 +383,12 @@ class StructArray(Struct):
     def __getitem__(self, i):
         return self.array[i]
 
+    def __len__(self):
+        return len(self.array)
+
+    def __iter__(self):
+        return iter(self.array)
+
     @classmethod
     def size(cls):
         return cls.item_struct.size() * cls.array_size
@@ -451,6 +441,208 @@ class TreeNode(Struct):
         srep += ind + f"    children = {len(self)},\n"
         srep += ind + ")"
         return srep
+
+
+class RootNode(TreeNode):
+    """Base class for root tree nodes (Pulsed, Amplifier, Stimulus)."""
+
+    def __init__(self, bundle, offset=0, size=None):
+        fh = bundle.fh
+        fh.seek(offset)
+
+        magic = fh.read(4)
+        if magic == b"eerT":
+            self.endian = "<"
+        elif magic == b"Tree":
+            self.endian = ">"
+        else:
+            raise RuntimeError(f"Bad file magic: {magic}")
+
+        levels = struct.unpack(self.endian + "i", fh.read(4))[0]
+
+        self.level_sizes = [
+            struct.unpack(self.endian + "i", fh.read(4))[0] for _ in range(levels)
+        ]
+
+        super().__init__(fh, self)
+
+
+@dataclass(init=False, repr=False)
+class UserParamDescrType(Struct):
+    Name: str = struct_field("32s", cstr)
+    Unit: str = struct_field("8s", cstr)
+    size_check = 40
+
+
+@dataclass(init=False, repr=False)
+class LockInParams(Struct):
+    ExtCalPhase: float = struct_field("d")
+    ExtCalAtten: float = struct_field("d")
+    PLPhase: float = struct_field("d")
+    PLPhaseY1: float = struct_field("d")
+    PLPhaseY2: float = struct_field("d")
+    UsedPhaseShift: float = struct_field("d")
+    UsedAttenuation: float = struct_field("d")
+    Spares2: str = struct_field("8s", None)
+    ExtCalValid: bool = struct_field("?")
+    PLPhaseValid: bool = struct_field("?")
+    LockInMode: int = struct_field("b")
+    CalMode: int = struct_field("b")
+    Spares: str = struct_field("28s", None)
+    size_check = 96
+
+
+@dataclass(init=False, repr=False)
+class StimSegmentRecord(TreeNode):
+    Mark: int = struct_field("i")
+    Class: int = struct_field("b", getSegmentClass)
+    StoreKind: int = struct_field("b", getStoreType)
+    VoltageIncMode: int = struct_field("b", getIncrementMode)
+    DurationIncMode: int = struct_field("b", getIncrementMode)
+    Voltage: float = struct_field("d")
+    VoltageSource: int = struct_field("i", getSourceType)
+    DeltaVFactor: float = struct_field("d")
+    DeltaVIncrement: float = struct_field("d")
+    Duration: float = struct_field("d")
+    DurationSource: int = struct_field("i", getSourceType)
+    DeltaTFactor: float = struct_field("d")
+    DeltaTIncrement: float = struct_field("d")
+    Filler1: int = struct_field("i", None)
+    CRC: int = struct_field("I")
+    ScanRate: float = struct_field("d")
+    size_check = 80
+
+
+@dataclass(init=False, repr=False)
+class ChannelRecord(TreeNode):
+    Mark: int = struct_field("i")
+    LinkedChannel: int = struct_field("i")
+    CompressionFactor: int = struct_field("i")
+    YUnit: str = struct_field("8s", cstr)
+    AdcChannel: int = struct_field("h")
+    AdcMode: int = struct_field("b", getADCMode)
+    DoWrite: bool = struct_field("?")
+    LeakStore: int = struct_field("b", getLeakStoreType)
+    AmplMode: int = struct_field("b", getAmplMode)
+    OwnSegTime: bool = struct_field("?")
+    SetLastSegVmemb: bool = struct_field("?")
+    DacChannel: int = struct_field("h")
+    DacMode: int = struct_field("b")
+    HasLockInSquare: int = struct_field("b")
+    RelevantXSegment: int = struct_field("i")
+    RelevantYSegment: int = struct_field("i")
+    DacUnit: str = struct_field("8s", cstr)
+    Holding: float = struct_field("d")
+    LeakHolding: float = struct_field("d")
+    LeakSize: float = struct_field("d")
+    LeakHoldMode: int = struct_field("b", getLeakHoldMode)
+    LeakAlternate: bool = struct_field("?")
+    AltLeakAveraging: bool = struct_field("?")
+    LeakPulseOn: bool = struct_field("?")
+    StimToDacID: int = struct_field("h", convertStimToDacID)
+    CompressionMode: int = struct_field("h")
+    CompressionSkip: int = struct_field("i")
+    DacBit: int = struct_field("h")
+    HasLockInSine: bool = struct_field("?")
+    BreakMode: int = struct_field("b")
+    ZeroSeg: int = struct_field("i")
+    StimSweep: int = struct_field("i")
+    Sine_Cycle: float = struct_field("d")
+    Sine_Amplitude: float = struct_field("d")
+    LockIn_VReversal: float = struct_field("d")
+    Chirp_StartFreq: float = struct_field("d")
+    Chirp_EndFreq: float = struct_field("d")
+    Chirp_MinPoints: float = struct_field("d")
+    Square_NegAmpl: float = struct_field("d")
+    Square_DurFactor: float = struct_field("d")
+    LockIn_Skip: int = struct_field("i")
+    Photo_MaxCycles: int = struct_field("i")
+    Photo_SegmentNo: int = struct_field("i")
+    LockIn_AvgCycles: int = struct_field("i")
+    Imaging_RoiNo: int = struct_field("i")
+    Chirp_Skip: int = struct_field("i")
+    Chirp_Amplitude: float = struct_field("d")
+    Photo_Adapt: int = struct_field("b")
+    Sine_Kind: int = struct_field("b")
+    Chirp_PreChirp: int = struct_field("b")
+    Sine_Source: int = struct_field("b")
+    Square_NegSource: int = struct_field("b")
+    Square_PosSource: int = struct_field("b")
+    Chirp_Kind: int = struct_field("b", getChirpKind)
+    Chirp_Source: int = struct_field("b")
+    DacOffset: float = struct_field("d")
+    AdcOffset: float = struct_field("d")
+    TraceMathFormat: int = struct_field("b")
+    HasChirp: bool = struct_field("?")
+    Square_Kind: int = struct_field("b", getSquareKind)
+    Filler1: bytes = struct_field("5c", None)
+    Square_BaseIncr: float = struct_field("d")
+    Square_Cycle: float = struct_field("d")
+    Square_PosAmpl: float = struct_field("d")
+    CompressionOffset: int = struct_field("i")
+    PhotoMode: int = struct_field("i")
+    BreakLevel: float = struct_field("d")
+    TraceMath: str = struct_field("128s", cstr)
+    Filler2: int = struct_field("i", None)
+    CRC: int = struct_field("I")
+    size_check = 400
+
+
+@dataclass(init=False, repr=False)
+class AmpSeriesRecord(TreeNode):
+    Mark: int = struct_field("i")
+    StateCount: int = struct_field("i")
+    Filler1: int = struct_field("i", None)
+    CRC: int = struct_field("I")
+    size_check = 16
+
+
+@dataclass(init=False, repr=False)
+class Pulsed(RootNode):
+    Version: int = struct_field("i")
+    Mark: int = struct_field("i")
+    VersionName: str = struct_field("32s", cstr)
+    AuxFileName: str = struct_field("80s", cstr)
+    RootText: str = struct_field("400s", cstr)
+    StartTime: float = struct_field("d", heka_time_to_datetime)
+    MaxSamples: int = struct_field("i")
+    CRC: int = struct_field("I")
+    Features: int = struct_field("h")
+    Filler1: int = struct_field("h", None)
+    Filler2: int = struct_field("i", None)
+    TcEnumerator: int = struct_field("32h")
+    TcKind: int = struct_field("32b")
+    size_check = 640
+
+
+@dataclass(init=False, repr=False)
+class Amplifier(RootNode):
+    Version: int = struct_field("i")
+    Mark: int = struct_field("i")
+    VersionName: str = struct_field("32s", cstr)
+    AmplifierName: str = struct_field("32s", cstr)
+    Amplifier: int = struct_field("b")
+    ADBoard: int = struct_field("b")
+    Creator: int = struct_field("b")
+    Filler1: bytes = struct_field("c", None)
+    CRC: int = struct_field("I")
+    size_check = 80
+
+
+@dataclass(init=False, repr=False)
+class Stimulus(RootNode):
+    Version: int = struct_field("i")
+    Mark: int = struct_field("i")
+    VersionName: str = struct_field("32s", cstr)
+    MaxSamples: int = struct_field("i")
+    Filler1: int = struct_field("i", None)
+    Params: float = struct_field("10d")
+    ParamText: bytes = struct_field("320c", None)
+    Reserved: str = struct_field("128s", cstr)
+    Filler2: int = struct_field("i", None)
+    Reserved2: str = struct_field("560s", None)
+    CRC: int = struct_field("I")
+    size_check = 1144
 
 
 class Data:
