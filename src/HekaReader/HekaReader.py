@@ -20,9 +20,9 @@ Brief example::
 
 """
 
-from heka import Data, heka_v9, heka_v1000, heka_v2000
-
 import re
+
+from heka import Data, heka_v9, heka_v1000, heka_v2000
 
 
 def read_bundle_header_version(filepath):
@@ -148,14 +148,12 @@ class Bundle:
             raise
 
     def _parse(self):
-        format = get_file_format_version(self.file_name)
-
         FORMAT_MAP = {
             "v9": heka_v9,
             "v1000": heka_v1000,
             "v2000": heka_v2000,
         }
-        self.file_format = f"v{format}"
+        self.file_format = f"v{get_file_format_version(self.file_name)}"
         self.v = FORMAT_MAP.get(self.file_format)
 
         self.item_classes = {
