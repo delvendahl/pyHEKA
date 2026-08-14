@@ -2,6 +2,7 @@ import collections
 import datetime
 import re
 import struct
+import dataclasses
 
 import numpy as np
 
@@ -248,15 +249,16 @@ class Struct:
     _fields_parsed = None
 
     def __init__(self, data, endian="<"):
-        field_info = self._field_info()
+        cls = self.__class__
+        cls._init_struct_formats()
         if not isinstance(data, (str, bytes)):
-            data = data.read(self._le_struct.size)
+            data = data.read(cls._le_struct.size)
 
-        struct_obj = self._le_struct if endian == "<" else self._be_struct
+        struct_obj = cls._le_struct if endian == "<" else cls._be_struct
         items = struct_obj.unpack(data)
 
         i = 0
-        for name, fmt, func in field_info:
+        for name, fmt, func in cls._fields_parsed:
             if len(fmt) == 1 or fmt[-1] == "s":
                 item = items[i]
                 i += 1
@@ -281,19 +283,21 @@ class Struct:
             setattr(self, name, item)
 
     @classmethod
-    def _field_info(cls):
-        if cls._fields_parsed is not None:
-            return cls._fields_parsed
+    def _init_struct_formats(cls):
+        # Prevent subclass caching conflicts
+        if cls.__dict__.get("_fields_parsed") is not None:
+            return
 
         fmt = ""
-        fields = []
-        if cls.field_info is not None:
-            for items in cls.field_info:
-                if len(items) == 3:
-                    name, ifmt, func = items
-                else:
-                    name, ifmt = items
-                    func = True
+        cls._fields_parsed = []
+
+        if dataclasses.is_dataclass(cls):
+            for f in dataclasses.fields(cls):
+                name = f.name
+                ifmt = f.metadata.get("fmt")
+                if ifmt is None:
+                    continue
+                func = f.metadata.get("func", True)
 
                 if isinstance(ifmt, type) and issubclass(ifmt, Struct):
                     func = (ifmt, func)
@@ -301,20 +305,36 @@ class Struct:
                 elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
                     raise TypeError(f'Unsupported format string "{ifmt}"')
 
-                fields.append((name, ifmt, func))
+                cls._fields_parsed.append((name, ifmt, func))
                 fmt += ifmt
+        else:
+            if cls.field_info is not None:
+                for items in cls.field_info:
+                    if len(items) == 3:
+                        name, ifmt, func = items
+                    else:
+                        name, ifmt = items
+                        func = True
+
+                    if isinstance(ifmt, type) and issubclass(ifmt, Struct):
+                        func = (ifmt, func)
+                        ifmt = f"{ifmt.size()}s"
+                    elif re.match(r"\d*[xcbB?hHiIlLqQfdspP]", ifmt) is None:
+                        raise TypeError(f'Unsupported format string "{ifmt}"')
+
+                    cls._fields_parsed.append((name, ifmt, func))
+                    fmt += ifmt
+
         cls._le_struct = struct.Struct("<" + fmt)
         cls._be_struct = struct.Struct(">" + fmt)
-        cls._fields_parsed = fields
         if cls.size_check is not None:
             assert cls._le_struct.size == cls.size_check, (
                 f"{cls.size_check} expected vs. {cls._le_struct.size}"
             )
-        return fields
 
     @classmethod
     def size(cls):
-        cls._field_info()
+        cls._init_struct_formats()
         return cls._le_struct.size
 
     @classmethod
@@ -326,9 +346,11 @@ class Struct:
         )
 
     def __str__(self, indent=0):
+        cls = self.__class__
+        cls._init_struct_formats()
         indent_str = "    " * indent
         r = indent_str + f"{self.__class__.__name__}(\n"
-        for name, _, _ in self._field_info():
+        for name, _, _ in cls._fields_parsed:
             if hasattr(self, name):
                 v = getattr(self, name)
                 if isinstance(v, Struct):
@@ -345,17 +367,19 @@ class Struct:
         return self.__str__(indent)
 
     def get_fields(self):
-        fields = collections.OrderedDict()
-        for name, _, _ in self._field_info():
+        cls = self.__class__
+        cls._init_struct_formats()
+        fields_dict = collections.OrderedDict()
+        for name, _, _ in cls._fields_parsed:
             if hasattr(self, name):
                 v = getattr(self, name)
                 if isinstance(v, StructArray):
-                    fields[name] = [x.get_fields() for x in v.array]
+                    fields_dict[name] = [x.get_fields() for x in v.array]
                 elif isinstance(v, Struct):
-                    fields[name] = v.get_fields()
+                    fields_dict[name] = v.get_fields()
                 else:
-                    fields[name] = v
-        return fields
+                    fields_dict[name] = v
+        return fields_dict
 
 
 class StructArray(Struct):
