@@ -50,6 +50,14 @@ class TestBundleLogic(unittest.TestCase):
                 # Check that close was called on the file handle upon exiting with-block
                 mock_file.close.assert_called()
 
+    def test_bundle_header_str(self):
+        dat_file = os.path.join(os.path.dirname(__file__), "2026-05-19_001.dat")
+        if os.path.exists(dat_file):
+            with Bundle(dat_file) as bundle:
+                header_str = str(bundle.header)
+                self.assertIn("BundleHeader(", header_str)
+                self.assertIn("BundleItem[12](", header_str)
+
 
 if __name__ == "__main__":
     unittest.main()
