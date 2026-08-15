@@ -86,6 +86,10 @@ for group in pul.children:
 
 You can load the actual raw trace data into NumPy arrays using the `.data` property:
 
+> [!NOTE]
+>Note that data is loaded using Python indices, which are zero-based, while HEKA uses one-based indices.
+
+
 ```python
 group_idx = 0
 series_idx = 0
@@ -99,6 +103,7 @@ print("Shape of trace data array:", trace_data.shape)
 print("Trace sample values:", trace_data[:10])
 ```
 
+
 ---
 
 ## Development & Testing
@@ -108,6 +113,11 @@ To run the unit tests, run:
 ```bash
 python3 -m unittest discover -s tests -p "test_*.py"
 ```
+
+
+## Acknowledgements
+
+The code is based on work by Luke Campagnola (https://github.com/campagnola/heka_reader). Additional contributions and improvements have been made to enhance performance, usability, and compatibility with different .dat file versions.
 
 ## License
 
