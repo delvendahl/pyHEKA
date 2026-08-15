@@ -2,26 +2,32 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from .heka_common import (
+    Amplifier as BaseAmplifier,
+)
+from .heka_common import (
     AmpSeriesRecord,
     ChannelRecord,
     LockInParams,
-    Pulsed as BasePulsed,
-    Amplifier as BaseAmplifier,
-    Stimulus as BaseStimulus,
     StimSegmentRecord,
     TreeNode,
     UserParamDescrType,
+    convertDataKind,
     cstr,
     getADCMode,
-    getRecordingMode,
     getDataFormat,
-    heka_time_to_datetime,
-    timer_timestamp,
-    struct_field,
-    convertDataKind,
+    getRecordingMode,
     getTriggerKind,
+    heka_time_to_datetime,
+    struct_field,
+    timer_timestamp,
 )
-from .heka_v1000 import AmplifierState
+from .heka_common import (
+    Pulsed as BasePulsed,
+)
+from .heka_common import (
+    Stimulus as BaseStimulus,
+)
+from .heka_v1000 import AmplifierState, BundleHeader, BundleItem
 
 
 @dataclass(init=False, repr=False)

@@ -1,26 +1,5 @@
-"""
-Heka Patchmaster .dat file reader
-Adapted from https://github.com/campagnola/heka_reader
-
-Structure definitions adapted from StimFit hekalib.cpp
-
-Brief example::
-
-    # Load a .dat file
-    bundle = Bundle(file_name)
-
-    # Select a trace
-    trace = bundle.pul[group_ind][series_ind][sweep_ind][trace_ind]
-
-    # Print meta-data for this trace
-    print(trace)
-
-    # Load data for this trace
-    data = bundle.data[group_id, series_id, sweep_ind, trace_ind]
-
-"""
-
 import re
+import os
 
 from .heka import Data, heka_v9, heka_v1000, heka_v2000
 
@@ -228,9 +207,14 @@ class Bundle:
             f"items={list(self.catalog.keys())!r})"
         )
 
+    def get_file_size(self):
+        """Return the size of the file in kilobytes."""
+        return os.fstat(self.fh.fileno()).st_size / 1024
+
     def summary(self, detailed=False):
         """Print a summary of the bundle content."""
         print(f"File: {self.file_name}")
+        print(f"Size: {self.get_file_size():.2f} KB")
         print(f"Format: {self.file_format}")
         print(f"Version: {self.header.Version}")
         print(f"Time: {self.header.Time}")
