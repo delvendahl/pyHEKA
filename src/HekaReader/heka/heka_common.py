@@ -50,7 +50,9 @@ def heka_time_to_datetime(stored_time) -> datetime.datetime:
     try:
         # Fast path for standard HEKA timestamps (seconds since 1990-01-01)
         if isinstance(stored_time, (int, float)) and 0 <= stored_time < 3500000000:
-            return (_HEKA_EPOCH + datetime.timedelta(seconds=stored_time)).replace(tzinfo=None)
+            return (_HEKA_EPOCH + datetime.timedelta(seconds=stored_time)).replace(
+                tzinfo=None
+            )
 
         c = _HEKA_EPOCH + datetime.timedelta(seconds=stored_time)
 
@@ -262,7 +264,7 @@ class Struct:
         d = self.__dict__
         for name, getter, transform in cls._unpack_plan:
             if isinstance(getter, tuple):
-                val = items[getter[0]:getter[1]]
+                val = items[getter[0] : getter[1]]
             else:
                 val = items[getter]
 
@@ -684,5 +686,5 @@ class Data:
         dtype = np.dtype(convertDataFormatToNP(trace.DataFormat))
         if not trace.DataKind["IsLittleEndian"]:
             dtype = dtype.newbyteorder(">")
-        data = np.fromfile(fh, count=trace.DataPoints, dtype=dtype)
-        return (data * trace.DataScaler).astype(np.float64)
+        data = np.fromfile(fh, dtype=dtype, count=trace.DataPoints)
+        return data * trace.DataScaler
