@@ -36,39 +36,43 @@ def cchar(byt):
     return byt.decode("utf-8", errors="ignore")
 
 
+_UTC = datetime.timezone.utc
+_HEKA_EPOCH = datetime.datetime(1990, 1, 1, tzinfo=_UTC)
+_LOWER_BOUND = datetime.datetime(1990, 1, 1, tzinfo=_UTC)
+_WIN_EPOCH = datetime.datetime(1601, 1, 1, tzinfo=_UTC)
+_MAC_EPOCH = datetime.datetime(1904, 1, 1, tzinfo=_UTC)
+_WINDOWS_OFFSET = 7980681600.0
+_SECONDS_1904_TO_1990 = 2713910400.0
+
+
 def heka_time_to_datetime(stored_time) -> datetime.datetime:
     """convert HEKA time to a datetime object"""
-    utc = datetime.timezone.utc
-    HekaEpoch = datetime.datetime(1990, 1, 1, tzinfo=utc)
-
     try:
-        c = HekaEpoch + datetime.timedelta(seconds=stored_time)
+        # Fast path for standard HEKA timestamps (seconds since 1990-01-01)
+        if isinstance(stored_time, (int, float)) and 0 <= stored_time < 3500000000:
+            return (_HEKA_EPOCH + datetime.timedelta(seconds=stored_time)).replace(tzinfo=None)
 
-        now = datetime.datetime.now(tz=utc)
-        lower = datetime.datetime(1990, 1, 1, tzinfo=utc)
+        c = _HEKA_EPOCH + datetime.timedelta(seconds=stored_time)
+
+        now = datetime.datetime.now(tz=_UTC)
         upper = now + datetime.timedelta(days=7)
 
-        if lower < c < upper:
+        if _LOWER_BOUND < c < upper:
             return c.replace(tzinfo=None)
-
-        WinEpoch = datetime.datetime(1601, 1, 1, tzinfo=utc)
-        MacEpoch = datetime.datetime(1904, 1, 1, tzinfo=utc)
-        windows_offset = 7980681600.0
-        seconds_1904_to_1990 = 2713910400.0
 
         candidates = []
         wrap = 2**32
         if stored_time > wrap:
-            t = stored_time + windows_offset
-            candidates.append(WinEpoch + datetime.timedelta(seconds=t))
+            t = stored_time + _WINDOWS_OFFSET
+            candidates.append(_WIN_EPOCH + datetime.timedelta(seconds=t))
 
         candidates.append(c)
 
-        t = stored_time - seconds_1904_to_1990
-        candidates.append(MacEpoch + datetime.timedelta(seconds=t))
+        t = stored_time - _SECONDS_1904_TO_1990
+        candidates.append(_MAC_EPOCH + datetime.timedelta(seconds=t))
 
         for c in candidates:
-            if lower < c < upper:
+            if _LOWER_BOUND < c < upper:
                 return c.replace(tzinfo=None)
 
         return candidates[0].replace(tzinfo=None)
@@ -243,46 +247,40 @@ def getTriggerKind(byte):
 
 
 class Struct:
-    _fields_parsed = None
+    _unpack_plan = None
 
     def __init__(self, data, endian="<"):
         cls = self.__class__
-        cls._init_struct_formats()
-        if not isinstance(data, (str, bytes)):
-            data = data.read(cls._le_struct.size)
+        if cls.__dict__.get("_unpack_plan") is None:
+            cls._init_struct_formats()
 
-        struct_obj = cls._le_struct if endian == "<" else cls._be_struct
-        items = struct_obj.unpack(data)
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            data = data.read(cls._le_size)
 
-        i = 0
-        for name, fmt, func in cls._fields_parsed:
-            if len(fmt) == 1 or fmt[-1] == "s":
-                item = items[i]
-                i += 1
+        items = (cls._le_struct if endian == "<" else cls._be_struct).unpack(data)
+
+        d = self.__dict__
+        for name, getter, transform in cls._unpack_plan:
+            if isinstance(getter, tuple):
+                val = items[getter[0]:getter[1]]
             else:
-                n = int(fmt[:-1])
-                item = items[i : i + n]
-                i += n
+                val = items[getter]
 
-            if func is not True:
-                if isinstance(func, tuple):
-                    substr, func = func
-                    item = substr(item, endian)
+            if transform is not None:
+                if isinstance(transform, tuple):
+                    substr, func = transform
+                    val = substr(val, endian)
+                    if func is not True and callable(func):
+                        val = func(val)
+                elif callable(transform):
+                    val = transform(val)
 
-                if func is None:
-                    continue
-
-                if callable(func):
-                    item = func(item)
-                elif func is False:
-                    continue
-
-            setattr(self, name, item)
+            d[name] = val
 
     @classmethod
     def _init_struct_formats(cls):
         # Prevent subclass caching conflicts
-        if cls.__dict__.get("_fields_parsed") is not None:
+        if cls.__dict__.get("_unpack_plan") is not None:
             return
 
         if not dataclasses.is_dataclass(cls):
@@ -292,7 +290,9 @@ class Struct:
 
         fmt = ""
         cls._fields_parsed = []
+        plan = []
 
+        item_idx = 0
         for f in dataclasses.fields(cls):
             name = f.name
             ifmt = f.metadata.get("fmt")
@@ -309,8 +309,25 @@ class Struct:
             cls._fields_parsed.append((name, ifmt, func))
             fmt += ifmt
 
+            if len(ifmt) == 1 or ifmt[-1] == "s":
+                getter = item_idx
+                item_idx += 1
+            else:
+                n = int(ifmt[:-1])
+                getter = (item_idx, item_idx + n)
+                item_idx += n
+
+            if func is None or func is False:
+                continue
+
+            transform = None if func is True else func
+            plan.append((name, getter, transform))
+
+        cls._unpack_plan = plan
         cls._le_struct = struct.Struct("<" + fmt)
         cls._be_struct = struct.Struct(">" + fmt)
+        cls._le_size = cls._le_struct.size
+
         if hasattr(cls, "size_check") and cls.size_check is not None:
             assert cls._le_struct.size == cls.size_check, (
                 f"{cls.size_check} expected vs. {cls._le_struct.size}"
@@ -318,8 +335,9 @@ class Struct:
 
     @classmethod
     def size(cls):
-        cls._init_struct_formats()
-        return cls._le_struct.size
+        if cls.__dict__.get("_unpack_plan") is None:
+            cls._init_struct_formats()
+        return cls._le_size
 
     @classmethod
     def array(cls, x):
