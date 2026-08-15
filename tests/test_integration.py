@@ -1,9 +1,12 @@
-import sys
 import os
+import sys
 import unittest
+
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 from HekaReader import Bundle
 
@@ -15,7 +18,9 @@ class TestIntegrationHekaReader(unittest.TestCase):
 
     def test_real_file_load_and_basic_metadata(self):
         # Ensure the test file exists
-        self.assertTrue(os.path.exists(self.dat_filepath), "Test dat file does not exist!")
+        self.assertTrue(
+            os.path.exists(self.dat_filepath), "Test dat file does not exist!"
+        )
 
         with Bundle(self.dat_filepath) as bundle:
             # Check basic properties
@@ -47,7 +52,7 @@ class TestIntegrationHekaReader(unittest.TestCase):
             series_labels = [s.Label for s in group]
             self.assertEqual(
                 series_labels,
-                ["conti_vc", "iv_vc", "pulse_leak_vc", "conti_cc", "step_cc"]
+                ["conti_vc", "iv_vc", "pulse_leak_vc", "conti_cc", "step_cc"],
             )
 
             # Check Sweep counts (via actual child counts vs metadata)

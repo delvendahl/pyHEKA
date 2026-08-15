@@ -1,11 +1,12 @@
+import os
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-import os
-
 # Add the src/ directory to sys.path so we can import HekaReader package properly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 from HekaReader import Bundle
 
