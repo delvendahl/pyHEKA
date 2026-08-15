@@ -209,7 +209,11 @@ class Bundle:
 
     def get_file_size(self):
         """Return the size of the file in kilobytes."""
-        return os.fstat(self.fh.fileno()).st_size / 1024
+        if hasattr(self, "fh") and self.fh and not self.fh.closed:
+            return os.fstat(self.fh.fileno()).st_size / 1024
+        if hasattr(self, "file_name") and self.file_name and os.path.exists(self.file_name):
+            return os.path.getsize(self.file_name) / 1024
+        return 0.0
 
     def summary(self, detailed=False):
         """Print a summary of the bundle content."""

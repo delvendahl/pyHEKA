@@ -393,6 +393,9 @@ class StructArray(Struct):
     def size(cls):
         return cls.item_struct.size() * cls.array_size
 
+    def __str__(self, indent=0):
+        return self.__repr__(indent)
+
     def __repr__(self, indent=0):
         r = "    " * indent + f"{self.__class__.__name__}(\n"
         for item in self.array:
