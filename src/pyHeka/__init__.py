@@ -1,3 +1,3 @@
-from .pyHeka import Bundle
+from .pyheka import Bundle
 
 __all__ = ["Bundle"]

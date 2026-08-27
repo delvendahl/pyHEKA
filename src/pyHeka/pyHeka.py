@@ -3,8 +3,8 @@ import re
 
 import numpy as np
 
-from pyHeka.FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
-from pyHeka.util import DatFileSeries, DatFileSweep
+from pyheka.FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
+from pyheka.util import DatFileSeries, DatFileSweep
 
 
 def read_bundle_header_version(filepath):

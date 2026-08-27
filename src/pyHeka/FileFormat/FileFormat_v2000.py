@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     AmpSeriesRecord,
     ChannelRecord,
     LockInParams,
@@ -25,7 +25,7 @@ from pyHeka.FileFormat.FileFormat_common import (
     struct_field,
     convertDataKind,
 )
-from pyHeka.FileFormat.FileFormat_v1000 import (
+from pyheka.FileFormat.FileFormat_v1000 import (
     GroupRecord,
     SweepRecord,
     StimulationRecord as BaseStimulationRecord,

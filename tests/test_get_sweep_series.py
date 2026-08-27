@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from pyHeka import Bundle
-from pyHeka.util import DatFileSeries, DatFileSweep
+from pyheka import Bundle
+from pyheka.util import DatFileSeries, DatFileSweep
 
 
 class TestBundleGetSweepAndGetSeries(unittest.TestCase):
@@ -15,7 +15,9 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
 
     def test_get_sweep_real_file(self):
         with Bundle(self.dat_filepath) as bundle:
-            sweep = bundle.get_sweep(group_index=0, series_index=1, sweep_index=0, trace_index=0)
+            sweep = bundle.get_sweep(
+                group_index=0, series_index=1, sweep_index=0, trace_index=0
+            )
             self.assertIsInstance(sweep, DatFileSweep)
             self.assertEqual(sweep.filename, "2026-05-19_001.dat")
             self.assertEqual(sweep.sweep_idx, (0, 1, 0, 0))
@@ -29,12 +31,20 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
     def test_get_sweep_invalid_indices(self):
         with Bundle(self.dat_filepath) as bundle:
             with self.assertRaises(ValueError) as ctx:
-                bundle.get_sweep(group_index=99, series_index=0, sweep_index=0, trace_index=0)
-            self.assertIn("Invalid group_index 99 or series_index 0", str(ctx.exception))
+                bundle.get_sweep(
+                    group_index=99, series_index=0, sweep_index=0, trace_index=0
+                )
+            self.assertIn(
+                "Invalid group_index 99 or series_index 0", str(ctx.exception)
+            )
 
             with self.assertRaises(ValueError) as ctx:
-                bundle.get_sweep(group_index=0, series_index=99, sweep_index=0, trace_index=0)
-            self.assertIn("Invalid group_index 0 or series_index 99", str(ctx.exception))
+                bundle.get_sweep(
+                    group_index=0, series_index=99, sweep_index=0, trace_index=0
+                )
+            self.assertIn(
+                "Invalid group_index 0 or series_index 99", str(ctx.exception)
+            )
 
     def test_get_series_real_file_default(self):
         with Bundle(self.dat_filepath) as bundle:
@@ -49,7 +59,9 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
 
     def test_get_series_concatenate(self):
         with Bundle(self.dat_filepath) as bundle:
-            series_default = bundle.get_series(group_index=0, series_index=1, trace_index=0)
+            series_default = bundle.get_series(
+                group_index=0, series_index=1, trace_index=0
+            )
             series_concat = bundle.get_series(
                 group_index=0, series_index=1, trace_index=0, concatenate_sweeps=True
             )
@@ -61,7 +73,9 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
 
     def test_get_series_average(self):
         with Bundle(self.dat_filepath) as bundle:
-            series_default = bundle.get_series(group_index=0, series_index=1, trace_index=0)
+            series_default = bundle.get_series(
+                group_index=0, series_index=1, trace_index=0
+            )
             series_avg = bundle.get_series(
                 group_index=0, series_index=1, trace_index=0, average_sweeps=True
             )
@@ -80,13 +94,17 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
                     concatenate_sweeps=True,
                     average_sweeps=True,
                 )
-            self.assertIn("Cannot concatenate and average at the same time", str(ctx.exception))
+            self.assertIn(
+                "Cannot concatenate and average at the same time", str(ctx.exception)
+            )
 
     def test_get_series_invalid_indices(self):
         with Bundle(self.dat_filepath) as bundle:
             with self.assertRaises(ValueError) as ctx:
                 bundle.get_series(group_index=99, series_index=0)
-            self.assertIn("Invalid group_index 99 or series_index 0", str(ctx.exception))
+            self.assertIn(
+                "Invalid group_index 99 or series_index 0", str(ctx.exception)
+            )
 
     def test_get_series_padded_sweeps_unequal_length(self):
         # Create mock bundle where sweeps return arrays of different lengths
@@ -123,7 +141,9 @@ class TestBundleGetSweepAndGetSeries(unittest.TestCase):
         mock_bundle.pgf = mock_pgf
 
         # Call get_series via method unbound call or bind method
-        series_res = Bundle.get_series(mock_bundle, group_index=0, series_index=0, trace_index=0)
+        series_res = Bundle.get_series(
+            mock_bundle, group_index=0, series_index=0, trace_index=0
+        )
 
         self.assertEqual(series_res.y.shape, (2, 3))
         # Second sweep should be padded with zero by np.pad

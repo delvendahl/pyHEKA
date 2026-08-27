@@ -1,9 +1,9 @@
-# pyHeka
+# pyHEKA
 
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org)
 [![License: GNU AGPL](https://img.shields.io/badge/License-GNU-yellow.svg)](LICENSE)
 
-`pyHeka` is a lightweight, efficient, and easy-to-use Python library for parsing and reading bundled `.dat` files created by HEKA Patchmaster or Patchmaster Next software. It supports several HEKA file versions including **v9**, **v1000**, and **v2000** formats.
+`pyHEKA` (**py**thon **H**andling and **E**xtraction **K**it for .dat file **A**nalysis) is a lightweight, efficient, and easy-to-use Python library for parsing and reading bundled `.dat` files created by HEKA Patchmaster or Patchmaster Next software. It supports several HEKA file versions including **v9**, **v1000**, and **v2000** formats.
 
 The library allows neuroscience researchers and electrophysiologists to load complex electrophysiology data tree structures directly into Python, access metadata, and read raw traces as NumPy arrays.
 
@@ -46,10 +46,10 @@ Here is a quick overview of how to use `pyHeka` to load and inspect your `.dat` 
 ### 1. Load a `.dat` Bundle
 
 ```python
-import pyHeka
+import pyheka
 
 # Load your HEKA .dat file
-with pyHeka.Bundle("path/to/your/file.dat") as bundle:
+with pyheka.Bundle("path/to/your/file.dat") as bundle:
     # Print basic info about the bundle format and metadata
     print(bundle)
 ```
@@ -57,7 +57,7 @@ with pyHeka.Bundle("path/to/your/file.dat") as bundle:
 For legacy support, you can also load a .DAT bundle without a context manager:
 
 ```python
-from pyHeka import Bundle
+from pyheka import Bundle
 
 # Load your HEKA .dat file
 bundle = Bundle("path/to/your/file.dat")
@@ -118,7 +118,7 @@ print("Trace sample values:", trace_data[:10])
 There are convenience methods to fetch entire series or sweeps, with options to concatenate or average sweeps. The following example shows how to fetch series #0 from group #0 without concatenating or averaging sweeps:
 
 ```python
-with pyHeka.Bundle('path/to/your/file.dat') as bundle:
+with pyheka.Bundle('path/to/your/file.dat') as bundle:
     series_data = bundle.get_series(group_index=0, series_index=0, concatenate_sweeps=False, average_sweeps=False)
 
 plt.plot(series_data.x, series_data.y[0])  # Plotting the first sweep
@@ -143,6 +143,11 @@ python3 -m unittest discover -s tests -p "test_*.py"
 
 The code is based on work by Luke Campagnola (https://github.com/campagnola/heka_reader). Additional contributions and improvements have been made to enhance performance, usability, and compatibility with different .dat file versions.
 
+**Note:** "Heka" in the package name refers to HEKA Elektronik (now part of 
+Harvard Bioscience), the manufacturer of the Patchmaster software and amplifiers 
+this package supports. The backronym above is just a fun reinterpretation for 
+the README — not an official expansion.
+
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU AGPL License. See the [LICENSE](LICENSE) file for details.

@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock
 import numpy as np
 
-from pyHeka.util import DatFileSeries, DatFileSweep
+from pyheka.util import DatFileSeries, DatFileSweep
 
 
 class TestUtil(unittest.TestCase):

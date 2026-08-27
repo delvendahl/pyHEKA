@@ -1,16 +1,15 @@
-import os
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pyHeka import Bundle
+from pyheka import Bundle
 
 
 class TestBundleSummary(unittest.TestCase):
     def setUp(self):
         # Mocking Bundle.__init__ to avoid file operations
-        with patch("pyHeka.pyHeka.open", MagicMock()):
-            with patch("pyHeka.FileFormat.FileFormat_v1000.BundleHeader", MagicMock()):
+        with patch("pyheka.pyheka.open", MagicMock()):
+            with patch("pyheka.FileFormat.FileFormat_v1000.BundleHeader", MagicMock()):
                 self.bundle = Bundle.__new__(Bundle)
                 self.bundle.file_name = "test_file.dat"
                 self.bundle.file_format = "v1000"

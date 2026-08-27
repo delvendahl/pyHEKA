@@ -1,13 +1,11 @@
 import datetime
-import os
 import struct
-import sys
 import unittest
 from dataclasses import dataclass
 
 import numpy as np
 
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     RootNode,
     Struct,
     StructArray,

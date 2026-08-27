@@ -1,10 +1,9 @@
 import os
-import sys
 import unittest
 
 import numpy as np
 
-from pyHeka import Bundle
+from pyheka import Bundle
 
 
 class TestIntegrationHekaReader(unittest.TestCase):

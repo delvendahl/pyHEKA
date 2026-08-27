@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     Amplifier as BaseAmplifier,
 )
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     AmpSeriesRecord,
     ChannelRecord,
     LockInParams,
@@ -21,13 +21,13 @@ from pyHeka.FileFormat.FileFormat_common import (
     struct_field,
     timer_timestamp,
 )
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     Pulsed as BasePulsed,
 )
-from pyHeka.FileFormat.FileFormat_common import (
+from pyheka.FileFormat.FileFormat_common import (
     Stimulus as BaseStimulus,
 )
-from pyHeka.FileFormat.FileFormat_v1000 import AmplifierState, BundleHeader, BundleItem
+from pyheka.FileFormat.FileFormat_v1000 import AmplifierState, BundleHeader, BundleItem
 
 
 @dataclass(init=False, repr=False)
