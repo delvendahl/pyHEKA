@@ -41,9 +41,20 @@ pip install -e .
 
 ## Example Usage
 
-Here is a quick overview of how to use `pyHeka` to load and inspect your `.dat` files.
+Here is a quick overview of how to use `pyHeka` to load and inspect your `.dat` files. We recommend using a context manager when reading files:
 
 ### 1. Load a `.dat` Bundle
+
+```python
+import pyHeka
+
+# Load your HEKA .dat file
+with pyHeka.Bundle("path/to/your/file.dat") as bundle:
+    # Print basic info about the bundle format and metadata
+    print(bundle)
+```
+
+For legacy support, you can also load a .DAT bundle without a context manager:
 
 ```python
 from pyHeka import Bundle
