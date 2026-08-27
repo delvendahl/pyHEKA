@@ -322,7 +322,7 @@ class Bundle:
 
     def get_sweep(self, group_index, series_index, sweep_index=0, trace_index=0):
         """
-        Extracts a single DatFileSweep from the bundle based on the specified group and series indices.
+        Extracts a single DatFileSweep from the bundle based on the specified group, series, sweep, and trace indices.
         """
         try:
             data_matrix = self.data[group_index, series_index, sweep_index, trace_index]
