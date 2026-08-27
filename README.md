@@ -1,9 +1,9 @@
-# HekaReader
+# pyHeka
 
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org)
 [![License: GNU AGPL](https://img.shields.io/badge/License-GNU-yellow.svg)](LICENSE)
 
-`HekaReader` is a lightweight, efficient, and easy-to-use Python library for parsing and reading bundled `.dat` files created by HEKA Patchmaster or Patchmaster Next software. It supports several HEKA file versions including **v9**, **v1000**, and **v2000** formats.
+`pyHeka` is a lightweight, efficient, and easy-to-use Python library for parsing and reading bundled `.dat` files created by HEKA Patchmaster or Patchmaster Next software. It supports several HEKA file versions including **v9**, **v1000**, and **v2000** formats.
 
 The library allows neuroscience researchers and electrophysiologists to load complex electrophysiology data tree structures directly into Python, access metadata, and read raw traces as NumPy arrays.
 
@@ -23,7 +23,7 @@ The library allows neuroscience researchers and electrophysiologists to load com
 
 ### From Source
 
-Ensure you have Python 3.9+ and `numpy` installed. You can install `HekaReader` from source using `pip`:
+Ensure you have Python 3.9+ and `numpy` installed. You can install `pyHeka` from source using `pip`:
 
 ```bash
 git clone https://github.com/delvendahl/HekaDatReader.git
@@ -41,12 +41,12 @@ pip install -e .
 
 ## Example Usage
 
-Here is a quick overview of how to use `HekaReader` to load and inspect your `.dat` files.
+Here is a quick overview of how to use `pyHeka` to load and inspect your `.dat` files.
 
 ### 1. Load a `.dat` Bundle
 
 ```python
-from HekaReader import Bundle
+from pyHeka import Bundle
 
 # Load your HEKA .dat file
 bundle = Bundle("path/to/your/file.dat")

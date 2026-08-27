@@ -7,8 +7,8 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 )
 
-from HekaReader import Bundle
-from HekaReader.HekaReader import determine_format_version
+from pyHeka import Bundle
+from pyHeka.pyHeka import determine_format_version
 
 
 class TestBundleLogic(unittest.TestCase):
@@ -38,7 +38,7 @@ class TestBundleLogic(unittest.TestCase):
 
         # Mock bundle v9/v1000/v2000 headers
         with patch("builtins.open", return_value=mock_file):
-            with patch("HekaReader.heka.heka_v2000.BundleHeader") as mock_header_cls:
+            with patch("pyHeka.FileFormat.FileFormat_v2000.BundleHeader") as mock_header_cls:
                 mock_header = MagicMock()
                 mock_header.IsLittleEndian = True
                 mock_header.BundleItems = []

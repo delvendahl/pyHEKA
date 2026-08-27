@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["HekaReader", "HekaReader.heka"]
+packages = ["pyHeka", "pyHeka.FileFormat"]
 
 [project]
-name = "HekaReader"
+name = "pyHeka"
 version = "1.0.0"
 description = "Heka Dat File Reader"
 readme = "README.md"

@@ -7,12 +7,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-# Add the src/ directory to sys.path so we can import HekaReader package properly
+# Add the src/ directory to sys.path so we can import pyHeka package properly
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 )
 
-from HekaReader.heka.heka_common import (
+from pyHeka.FileFormat.FileFormat_common import (
     RootNode,
     Struct,
     StructArray,

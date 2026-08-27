@@ -1,7 +1,7 @@
 import re
 import os
 
-from .heka import Data, heka_v9, heka_v1000, heka_v2000
+from .FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
 
 
 def read_bundle_header_version(filepath):
@@ -128,9 +128,9 @@ class Bundle:
 
     def _parse(self):
         FORMAT_MAP = {
-            "v9": heka_v9,
-            "v1000": heka_v1000,
-            "v2000": heka_v2000,
+            "v9": FileFormat_v9,
+            "v1000": FileFormat_v1000,
+            "v2000": FileFormat_v2000,
         }
         self.file_format = f"v{get_file_format_version(self.file_name)}"
         self.v = FORMAT_MAP.get(self.file_format)
