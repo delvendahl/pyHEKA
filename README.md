@@ -115,6 +115,19 @@ print("Trace sample values:", trace_data[:10])
 ```
 
 
+There are convenience methods to fetch entire series or sweeps, with options to concatenate or average sweeps. The following example shows how to fetch series #0 from group #0 without concatenating or averaging sweeps:
+
+```python
+with pyHeka.Bundle('path/to/your/file.dat') as bundle:
+    series_data = bundle.get_series(group_index=0, series_index=0, concatenate_sweeps=False, average_sweeps=False)
+
+plt.plot(series_data.x, series_data.y[0])  # Plotting the first sweep
+plt.xlabel(f'Time ({series_data.x_unit})')
+plt.ylabel(f'Data ({series_data.y_unit})')
+plt.title(f'Series {series_data.series_idx} data from {series_data.filename}')
+plt.show()
+```
+
 ---
 
 ## Development & Testing

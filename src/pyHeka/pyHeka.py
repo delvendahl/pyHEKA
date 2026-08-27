@@ -1,7 +1,10 @@
-import re
 import os
+import re
+
+import numpy as np
 
 from pyHeka.FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
+from pyHeka.util import DatFileSeries, DatFileSweep
 
 
 def read_bundle_header_version(filepath):
@@ -253,3 +256,89 @@ class Bundle:
                             f"    Series {j + 1}: {series.Label} (Mode: {mode}, {len(series)} sweeps)"
                         )
         print("-" * 40)
+
+    def get_series(
+        self,
+        group_index,
+        series_index,
+        trace_index=0,
+        concatenate_sweeps=False,
+        average_sweeps=False,
+    ):
+        """
+        Extracts a DatFileSeries from the bundle based on the specified group and series (and optionally trace) indices.
+        If concatenate_sweeps is True, all sweeps will be concatenated into a single time series.
+        If average_sweeps is True, all sweeps will be averaged into a single time series.
+        If both are False, the data will be returned as a 2D array (sweeps x time).
+        """
+        sweep_data = []
+        try:
+            for sweep in range(len(self.pul[group_index][series_index])):
+                sweep_data.append(
+                    self.data[group_index, series_index, sweep, trace_index]
+                )
+        except IndexError:
+            raise ValueError(
+                f"Invalid group_index {group_index} or series_index {series_index}."
+            )
+
+        # try to convert sweep_data to a numpy array, if it fails due to array shape mismatch, pad with NaNs to make it rectangular
+        try:
+            data_matrix = np.array(sweep_data)
+        except ValueError:
+            max_length = max(len(sweep) for sweep in sweep_data)
+            padded_data = [
+                np.pad(sweep, (0, max_length - len(sweep))) for sweep in sweep_data
+            ]
+            data_matrix = np.array(padded_data)
+
+        # check if concatenate and average are both True, which is not allowed
+        if concatenate_sweeps and average_sweeps:
+            raise ValueError(
+                "Cannot concatenate and average at the same time. Please choose one."
+            )
+        if average_sweeps:
+            data_matrix = np.nanmean(data_matrix, axis=0)
+        if concatenate_sweeps:
+            data_matrix = np.concatenate(data_matrix, axis=0)
+
+        sampling_interval = self.pgf[
+            group_index
+        ].SampleInterval  # Assuming uniform sampling
+        time_vector = np.arange(data_matrix.shape[-1]) * sampling_interval
+
+        return DatFileSeries(
+            x=time_vector,
+            y=data_matrix,
+            x_unit=self.pul[group_index][series_index][0][trace_index].XUnit,
+            y_unit=self.pul[group_index][series_index][0][trace_index].YUnit,
+            sampling_interval=sampling_interval,
+            filename=os.path.basename(self.file_name),
+            series_idx=(group_index, series_index),
+        )
+
+    def get_sweep(self, group_index, series_index, sweep_index=0, trace_index=0):
+        """
+        Extracts a single DatFileSweep from the bundle based on the specified group and series indices.
+        """
+        try:
+            data_matrix = self.data[group_index, series_index, sweep_index, trace_index]
+        except IndexError:
+            raise ValueError(
+                f"Invalid group_index {group_index} or series_index {series_index}."
+            )
+
+        sampling_interval = self.pgf[
+            group_index
+        ].SampleInterval  # Assuming uniform sampling
+        time_vector = np.arange(data_matrix.shape[-1]) * sampling_interval
+
+        return DatFileSweep(
+            x=time_vector,
+            y=data_matrix,
+            x_unit=self.pul[group_index][series_index][0][0].XUnit,
+            y_unit=self.pul[group_index][series_index][0][0].YUnit,
+            sampling_interval=sampling_interval,
+            filename=os.path.basename(self.file_name),
+            sweep_idx=(group_index, series_index, sweep_index, trace_index),
+        )
