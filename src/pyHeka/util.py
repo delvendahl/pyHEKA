@@ -33,18 +33,3 @@ class DatFileSweep:
     sweep_idx: tuple[
         int, int, int, int
     ]  # (group_index, series_index, sweep_index, trace_index)
-
-
-def get_pgf_index(bundle, group: int, series: int) -> int:
-
-    if group == 0:
-        return series
-
-    index = 0
-
-    for i in range(group):
-        index += len(bundle.pul[i].children)
-        if i == group:
-            index += series
-
-    return index

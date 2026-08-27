@@ -4,7 +4,7 @@ import re
 import numpy as np
 
 from pyHeka.FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
-from pyHeka.util import DatFileSeries, DatFileSweep, get_pgf_index
+from pyHeka.util import DatFileSeries, DatFileSweep
 
 
 def read_bundle_header_version(filepath):
@@ -302,8 +302,11 @@ class Bundle:
         if concatenate_sweeps:
             data_matrix = np.concatenate(data_matrix, axis=0)
 
+        pgf_series_index = (
+            sum(len(self.pul[i].children) for i in range(group_index)) + series_index
+        )
         sampling_interval = self.pgf[
-            get_pgf_index(self, group_index, series_index)
+            pgf_series_index
         ].SampleInterval  # Assuming uniform sampling
         time_vector = np.arange(data_matrix.shape[-1]) * sampling_interval
 
@@ -327,9 +330,11 @@ class Bundle:
             raise ValueError(
                 f"Invalid group_index {group_index} or series_index {series_index}."
             )
-
+        pgf_series_index = (
+            sum(len(self.pul[i].children) for i in range(group_index)) + series_index
+        )
         sampling_interval = self.pgf[
-            get_pgf_index(self, group_index, series_index)
+            pgf_series_index
         ].SampleInterval  # Assuming uniform sampling
         time_vector = np.arange(data_matrix.shape[-1]) * sampling_interval
 
