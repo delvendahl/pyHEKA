@@ -1,7 +1,7 @@
 import re
 import os
 
-from .FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
+from pyHeka.FileFormat import Data, FileFormat_v9, FileFormat_v1000, FileFormat_v2000
 
 
 def read_bundle_header_version(filepath):
@@ -211,7 +211,11 @@ class Bundle:
         """Return the size of the file in kilobytes."""
         if hasattr(self, "fh") and self.fh and not self.fh.closed:
             return os.fstat(self.fh.fileno()).st_size / 1024
-        if hasattr(self, "file_name") and self.file_name and os.path.exists(self.file_name):
+        if (
+            hasattr(self, "file_name")
+            and self.file_name
+            and os.path.exists(self.file_name)
+        ):
             return os.path.getsize(self.file_name) / 1024
         return 0.0
 
