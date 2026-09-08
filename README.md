@@ -21,13 +21,21 @@ The library allows neuroscience researchers and electrophysiologists to load com
 
 ## Installation
 
+### From PyPI
+
+The pyheka package is available on [PyPI](https://pypi.org/project/pyheka/).
+
+```bash
+pip install pyheka
+```
+
 ### From Source
 
 Ensure you have Python 3.9+ and `numpy` installed. You can install `pyHeka` from source using `pip`:
 
 ```bash
-git clone https://github.com/delvendahl/HekaDatReader.git
-cd HekaDatReader
+git clone https://github.com/delvendahl/pyheka.git
+cd pyheka
 pip install .
 ```
 
