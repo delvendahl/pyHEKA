@@ -8,7 +8,7 @@ packages = ["pyheka", "pyheka.FileFormat"]
 
 [project]
 name = "pyheka"
-version = "1.0.0"
+version = "1.0.1"
 description = "Heka Dat File Reader"
 readme = "README.md"
 authors = [
