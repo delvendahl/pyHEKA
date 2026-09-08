@@ -117,7 +117,7 @@ def get_file_format_version(filepath):
 
 class Bundle:
     """
-    Represent a PATCHMASTER tree file in memory
+    Represent a PATCHMASTER bundled .DAT tree file in memory
     """
 
     def __init__(self, file_name):
