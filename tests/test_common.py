@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from pyheka import heka_time_to_datetime as package_heka_time_to_datetime
 from pyheka.FileFormat.FileFormat_common import (
     RootNode,
     Struct,
@@ -41,6 +42,12 @@ from pyheka.FileFormat.FileFormat_common import (
 
 
 class TestHekaCommonHelpers(unittest.TestCase):
+    def test_heka_time_to_datetime_package_import(self):
+        self.assertEqual(
+            package_heka_time_to_datetime(0.0),
+            datetime.datetime(1990, 1, 1),
+        )
+
     def test_cstr(self):
         self.assertEqual(cstr(b"hello\0world"), "hello")
         self.assertEqual(cstr(b"no_null"), b"no_null")
